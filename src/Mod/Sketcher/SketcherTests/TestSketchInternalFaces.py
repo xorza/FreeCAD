@@ -449,8 +449,20 @@ class TestSketchInternalFaces(unittest.TestCase):
     # 11. Element naming
     # ==================================================================
 
-    def testInternalFaceNaming(self):
-        """InternalShape faces should have element names."""
+    def testInternalShapeHasEdgeNames(self):
+        """InternalShape edges should have mapped element names."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        self.Doc.recompute()
+        shape = sk.InternalShape
+        self.assertFalse(shape.isNull())
+        edge_names = [
+            name for name in shape.ElementReverseMap.keys() if name.startswith("Edge")
+        ]
+        self.assertGreater(len(edge_names), 0, "Edges should have element names")
+
+    def testInternalShapeHasFaceNames(self):
+        """InternalShape faces should have mapped element names."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
         self.Doc.recompute()
@@ -461,26 +473,29 @@ class TestSketchInternalFaces(unittest.TestCase):
         ]
         self.assertGreater(len(face_names), 0, "Internal faces should have element names")
 
-    def testInternalFaceNamingStableAfterRecompute(self):
-        """Face element names must be identical across recomputes."""
+    def testElementNamingStableAfterRecompute(self):
+        """Element names must be identical across recomputes."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
         self.Doc.recompute()
-        names_before = sorted(
-            name
-            for name in sk.InternalShape.ElementReverseMap.keys()
-            if name.startswith("Face")
-        )
+        names_before = sorted(sk.InternalShape.ElementReverseMap.keys())
         self.Doc.recompute()
-        names_after = sorted(
-            name
-            for name in sk.InternalShape.ElementReverseMap.keys()
-            if name.startswith("Face")
-        )
+        names_after = sorted(sk.InternalShape.ElementReverseMap.keys())
         self.assertEqual(names_before, names_after)
 
-    def testFaceNamingWithTwoShapes(self):
-        """Element names should be unique across multiple faces."""
+    def testElementNamingUniqueness(self):
+        """Element names should be unique across a multi-face internal shape."""
+        sk = self._make_sketch()
+        add_circle(sk, 0, 0, 10)
+        add_circle(sk, 12, 0, 10)
+        self.Doc.recompute()
+        shape = sk.InternalShape
+        all_names = list(shape.ElementReverseMap.keys())
+        self.assertEqual(len(all_names), len(set(all_names)),
+                         "All element names must be unique")
+
+    def testFaceNamingWithMultipleFaces(self):
+        """Each face should have a unique Face element name."""
         sk = self._make_sketch()
         add_circle(sk, 0, 0, 10)
         add_circle(sk, 12, 0, 10)
@@ -489,7 +504,5 @@ class TestSketchInternalFaces(unittest.TestCase):
         face_names = [
             name for name in shape.ElementReverseMap.keys() if name.startswith("Face")
         ]
-        # All names should be unique
         self.assertEqual(len(face_names), len(set(face_names)))
-        # Should have 3 face names for 3 faces
-        self.assertEqual(len(face_names), 3)
+        self.assertEqual(len(face_names), 3, "Should have 3 face names for 3 faces")
