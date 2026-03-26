@@ -17,6 +17,7 @@ set(Sketcher_TestScripts
     SketcherTests/TestSketcherSolver.py
     SketcherTests/TestSketchExpression.py
     SketcherTests/TestSketchValidateCoincidents.py
+    SketcherTests/TestSketchInternalFaces.py
 )
 
 if(BUILD_GUI)
