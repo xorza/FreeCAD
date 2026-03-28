@@ -596,6 +596,8 @@ SET(Part_SRCS
     FaceMakerCheese.h
     FaceMakerBullseye.cpp
     FaceMakerBullseye.h
+    FaceMakerBuildFace.cpp
+    FaceMakerBuildFace.h
     WireJoiner.cpp
     WireJoiner.h
 )

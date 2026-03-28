@@ -26,18 +26,11 @@
 #include <limits>
 #include <vector>
 
-#include <Bnd_Box.hxx>
-#include <BOPAlgo_BuilderFace.hxx>
-#include <BRep_Builder.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
-#include <BRepAlgoAPI_BuilderAlgo.hxx>
-#include <BRepBndLib.hxx>
 #include <Mod/Part/App/FCBRepAlgoAPI_Section.h>
 #include <BRepBuilderAPI_MakeEdge.hxx>
-#include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
-#include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepOffsetAPI_NormalProjection.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -480,136 +473,12 @@ Part::TopoShape SketchObject::buildInternals(const Part::TopoShape &edges) const
         return Part::TopoShape();
 
     try {
-        // Step 1: Collect all edges from the sketch shape
-        TopTools_ListOfShape edgeList;
-        for (TopExp_Explorer exp(edges.getShape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-            edgeList.Append(exp.Current());
-        }
-        if (edgeList.IsEmpty()) {
-            return Part::TopoShape();
-        }
-
-        // Step 2: Split edges at all mutual intersections using BRepAlgoAPI_BuilderAlgo
-        TopTools_ListOfShape splitEdges;
-        if (edgeList.Size() > 1) {
-            BRepAlgoAPI_BuilderAlgo splitter;
-            splitter.SetArguments(edgeList);
-            splitter.SetRunParallel(true);
-            splitter.SetNonDestructive(Standard_True);
-            double tol = InternalTolerance.getValue();
-            if (tol > 0) {
-                splitter.SetFuzzyValue(tol);
-            }
-            splitter.Build();
-            if (!splitter.IsDone()) {
-                FC_WARN("Failed to split sketch edges for face generation");
-                return Part::TopoShape();
-            }
-            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-                splitEdges.Append(exp.Current());
-            }
-        } else {
-            splitEdges = edgeList;
-        }
-
-        // Step 3: Build a planar face on the XY plane (sketch plane in local coords)
-        gp_Pln sketchPlane(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1));
-        const Standard_Real aMax = 1.0e8;
-        TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(
-            sketchPlane, -aMax, aMax, -aMax, aMax).Face();
-        baseFace.Orientation(TopAbs_FORWARD);
-
-        // Step 4: Add each split edge in both orientations and build PCurves
-        TopTools_ListOfShape edgesForFace;
-        for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-            const TopoDS_Edge& e = TopoDS::Edge(it.Value());
-            edgesForFace.Append(e.Oriented(TopAbs_FORWARD));
-            edgesForFace.Append(e.Oriented(TopAbs_REVERSED));
-        }
-        BRepLib::BuildPCurveForEdgesOnPlane(edgesForFace, baseFace);
-
-        // Step 5: Run BOPAlgo_BuilderFace to find all bounded face regions
-        BOPAlgo_BuilderFace faceBuilder;
-        faceBuilder.SetFace(baseFace);
-        faceBuilder.SetShapes(edgesForFace);
-        faceBuilder.Perform();
-        if (faceBuilder.HasErrors()) {
-            FC_WARN("BOPAlgo_BuilderFace failed for sketch face generation");
-            return Part::TopoShape();
-        }
-        // Step 6: Collect result faces, excluding the unbounded outer face.
-        // The base face spans ±1e8, so the outer face has a bounding box
-        // diagonal far larger than any real sketch geometry.
-        const double outerExtentThreshold = aMax * aMax;
-        const TopTools_ListOfShape& builtFaces = faceBuilder.Areas();
-        std::vector<TopoDS_Shape> rawFaces;
-        rawFaces.reserve(builtFaces.Size());
-        for (TopTools_ListIteratorOfListOfShape it(builtFaces); it.More(); it.Next()) {
-            Bnd_Box box;
-            BRepBndLib::Add(it.Value(), box);
-            if (box.SquareExtent() > outerExtentThreshold) {
-                continue;
-            }
-            rawFaces.push_back(it.Value());
-        }
-
-        if (rawFaces.empty()) {
-            return Part::TopoShape();
-        }
-
-        // Step 7: Build result compound and assign element names
-        // Replicate FaceMaker::postBuild() naming logic: each face gets a
-        // combo name derived from its boundary edge names.
-        TopoDS_Shape resultShape;
-        if (rawFaces.size() == 1) {
-            resultShape = rawFaces[0];
-        } else {
-            BRep_Builder brepBuilder;
-            TopoDS_Compound compound;
-            brepBuilder.MakeCompound(compound);
-            for (const auto& f : rawFaces) {
-                brepBuilder.Add(compound, f);
-            }
-            resultShape = compound;
-        }
-
         Part::TopoShape result(getID(), getDocument()->getStringHasher());
-        result.setShape(resultShape, false);
-        result.mapSubElement(edges, "SKF");
-
-        // Name each face using its boundary edge names (mirrors FaceMaker::postBuild)
-        int faceIndex = 0;
-        const auto& faces = result.getSubTopoShapes(TopAbs_FACE);
-        std::set<Data::MappedName> namesUsed;
-        for (const auto& face : faces) {
-            ++faceIndex;
-            Part::TopoShape wire = face.splitWires();
-            wire.mapSubElement(face);
-
-            std::vector<Data::MappedName> names;
-            Data::ElementIDRefs sids;
-            std::set<Data::MappedName> seen;
-            int edgeCount = wire.countSubShapes(TopAbs_EDGE);
-            for (int ei = 1; ei <= edgeCount; ++ei) {
-                Data::ElementIDRefs esids;
-                Data::MappedName name = face.getMappedName(
-                    Data::IndexedName::fromConst("Edge", ei), false, &esids);
-                if (name && seen.insert(name).second) {
-                    names.push_back(name);
-                    sids += esids;
-                    // Use at least one previously-unused edge name to avoid collisions
-                    if (namesUsed.insert(name).second) {
-                        break;
-                    }
-                }
-            }
-            if (!names.empty()) {
-                result.setElementComboName(
-                    Data::IndexedName::fromConst("Face", faceIndex),
-                    names, Part::OpCodes::Face, nullptr, &sids);
-            }
-        }
-        result.initCache(true);
+        result = result.makeElementFace(edges.getSubTopoShapes(TopAbs_WIRE),
+                /*op*/"",
+                /*maker*/"Part::FaceMakerBuildFace",
+                /*pln*/nullptr
+        );
 
         // Append open wires (edges not part of any closed face)
         Part::WireJoiner joiner;
@@ -619,10 +488,13 @@ Part::TopoShape SketchObject::buildInternals(const Part::TopoShape &edges) const
         Part::TopoShape openWires(getID(), getDocument()->getStringHasher());
         joiner.getOpenWires(openWires, "SKF");
 
-        if (!openWires.isNull()) {
-            return result.makeElementCompound({result, openWires});
+        if (openWires.isNull()) {
+            return result;  // No open wires, return either face or empty toposhape
         }
-        return result;
+        if (result.isNull()) {
+            return openWires;   // No face, but we have open wires to return as a shape
+        }
+        return result.makeElementCompound({result, openWires}); // Compound and return both
     } catch (Base::Exception &e) {
         FC_WARN("Failed to make face for sketch: " << e.what());
     } catch (Standard_Failure &e) {
