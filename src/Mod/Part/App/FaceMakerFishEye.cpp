@@ -24,10 +24,10 @@
 
 #include "FaceMakerFishEye.h"
 
-#include <BOPAlgo_BuilderFace.hxx>
+#include <BOPAlgo_Tools.hxx>
+#include <BOPTools_AlgoTools3D.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
-#include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -36,12 +36,10 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
-#include <BRepLib.hxx>
-#include <BRepLib_FindSurface.hxx>
 #include <BRepTools.hxx>
 #include <Bnd_Box.hxx>
-#include <GeomAdaptor_Surface.hxx>
 #include <GProp_GProps.hxx>
+#include <IntTools_Context.hxx>
 #include <Precision.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <TopExp_Explorer.hxx>
@@ -72,10 +70,10 @@ void FaceMakerFishEye::setPlane(const gp_Pln& plane)
     planeSupplied = true;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 namespace
 {
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 struct WireFace
 {
@@ -140,8 +138,6 @@ void unite(std::vector<int>& parent, int a, int b)
 
 // ─── Phase 1: Fuse overlapping wires ─────────────────────────────────────────
 
-// Detect partial overlaps, group with union-find, fuse each group.
-// Returns the resulting non-overlapping wires.
 std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& inputWires)
 {
     std::vector<WireFace> wfs;
@@ -230,13 +226,12 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
     return result;
 }
 
-// ─── Phase 2: Planar face building via BOPAlgo_BuilderFace ───────────────────
+// ─── Phase 2: Planar face building via BOPAlgo_Tools::WiresToFaces ───────────
 
 bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
-                      std::vector<TopoDS_Shape>& result,
-                      const gp_Pln* suppliedPlane)
+                      std::vector<TopoDS_Shape>& result)
 {
-    // Collect all edges
+    // Collect all edges from input wires
     TopTools_ListOfShape edgeList;
     for (const auto& w : wires) {
         for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
@@ -247,134 +242,65 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         return false;
     }
 
-    // Split edges at mutual intersections
-    TopTools_ListOfShape splitEdges;
-    if (edgeList.Size() > 1) {
-        BRepAlgoAPI_BuilderAlgo splitter;
-        splitter.SetArguments(edgeList);
-        splitter.SetRunParallel(true);
-        splitter.SetNonDestructive(Standard_True);
-        splitter.Build();
-        if (!splitter.IsDone()) {
-            return false;
-        }
-        for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-            splitEdges.Append(exp.Current());
-        }
-    }
-    else {
-        splitEdges = edgeList;
-    }
-
-    // Find the plane
-    gp_Pln plane;
-    if (suppliedPlane) {
-        plane = *suppliedPlane;
-    }
-    else {
-        BRep_Builder builder;
-        TopoDS_Compound edgeCompound;
-        builder.MakeCompound(edgeCompound);
-        for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-            builder.Add(edgeCompound, it.Value());
-        }
-        BRepLib_FindSurface planeFinder(edgeCompound, -1, Standard_True);
-        if (!planeFinder.Found()) {
-            return false;  // not planar — caller should try non-planar path
-        }
-        plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
-    }
-
-    // Build a large base face on the plane
-    const Standard_Real aMax = 1.0e8;
-    TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
-    baseFace.Orientation(TopAbs_FORWARD);
-
-    // Add split edges in both orientations and build pcurves
-    TopTools_ListOfShape edgesForFace;
-    for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-        const TopoDS_Edge& e = TopoDS::Edge(it.Value());
-        edgesForFace.Append(e.Oriented(TopAbs_FORWARD));
-        edgesForFace.Append(e.Oriented(TopAbs_REVERSED));
-    }
-    BRepLib::BuildPCurveForEdgesOnPlane(edgesForFace, baseFace);
-
-    // Run BOPAlgo_BuilderFace — finds all bounded regions, classifies holes
-    BOPAlgo_BuilderFace faceBuilder;
-    faceBuilder.SetFace(baseFace);
-    faceBuilder.SetShapes(edgesForFace);
-    faceBuilder.Perform();
-    if (faceBuilder.HasErrors()) {
+    // Split edges at mutual intersections via General Fuse
+    BRepAlgoAPI_BuilderAlgo splitter;
+    splitter.SetArguments(edgeList);
+    splitter.SetRunParallel(true);
+    splitter.SetNonDestructive(Standard_True);
+    splitter.Build();
+    if (!splitter.IsDone()) {
         return false;
     }
 
-    // Collect bounded regions (filter out the unbounded outer face)
-    const double outerExtentThreshold = aMax * aMax;
-    const TopTools_ListOfShape& builtFaces = faceBuilder.Areas();
-    std::vector<TopoDS_Face> regions;
-    for (TopTools_ListIteratorOfListOfShape it(builtFaces); it.More(); it.Next()) {
-        Bnd_Box box;
-        BRepBndLib::Add(it.Value(), box);
-        if (box.SquareExtent() > outerExtentThreshold) {
-            continue;
-        }
-        regions.push_back(TopoDS::Face(it.Value()));
+    // Collect split edges into a compound for EdgesToWires
+    BRep_Builder builder;
+    TopoDS_Compound edgeCompound;
+    builder.MakeCompound(edgeCompound);
+    for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
+        builder.Add(edgeCompound, exp.Current());
     }
 
-    if (regions.empty()) {
+    // EdgesToWires: connect split edges into closed wires
+    TopoDS_Shape wireShape;
+    BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
+
+    // WiresToFaces: build planar faces with proper hole nesting.
+    // This handles plane detection, pcurve building, BOPAlgo_BuilderFace,
+    // and hole-to-face assignment in one call.
+    TopoDS_Shape faceShape;
+    if (!BOPAlgo_Tools::WiresToFaces(wireShape, faceShape)) {
         return false;
     }
 
-    // BOPAlgo_BuilderFace produces ring faces (with holes) AND inner disc faces.
-    // Apply even-odd fill: count how many input wires contain each region.
-    // Use the center of mass of the region's OUTER WIRE (not the face) as
-    // the test point — the face center of mass can fall inside a hole.
-    //
-    // Build faces from input wires for containment testing
+    // Collect all resulting faces
+    std::vector<TopoDS_Face> allFaces;
+    for (TopExp_Explorer exp(faceShape, TopAbs_FACE); exp.More(); exp.Next()) {
+        allFaces.push_back(TopoDS::Face(exp.Current()));
+    }
+
+    if (allFaces.empty()) {
+        return false;
+    }
+
+    // BOPAlgo_BuilderFace (inside WiresToFaces) produces all bounded regions
+    // with proper hole assignment. But it returns ALL growth faces including
+    // islands inside holes. Apply even-odd nesting: keep faces whose interior
+    // point is inside an odd number of original input wires.
+    Handle(IntTools_Context) ctx = new IntTools_Context();
     std::vector<TopoDS_Face> wireFaces;
     wireFaces.reserve(wires.size());
     for (const auto& w : wires) {
         wireFaces.push_back(makeFaceFromWire(w));
     }
 
-    for (const auto& region : regions) {
-        // Get a test point: midpoint of the outer wire's first edge.
-        // This lies on the region boundary, which is ON a wire — so we
-        // offset slightly inward using the face normal and edge tangent.
-        TopoDS_Wire outerW = BRepTools::OuterWire(region);
-        TopExp_Explorer edgeExp(outerW, TopAbs_EDGE);
-        if (!edgeExp.More()) {
+    for (const auto& face : allFaces) {
+        // Get a robust interior point using OCCT's hatcher
+        gp_Pnt interiorPt;
+        gp_Pnt2d interiorPt2d;
+        if (BOPTools_AlgoTools3D::PointInFace(face, interiorPt, interiorPt2d, ctx) != 0) {
+            // Fallback: keep the face if we can't get an interior point
+            result.push_back(face);
             continue;
-        }
-        const TopoDS_Edge& testEdge = TopoDS::Edge(edgeExp.Current());
-        Standard_Real eFirst, eLast;
-        BRep_Tool::Range(testEdge, eFirst, eLast);
-        BRepAdaptor_Curve adaptor(testEdge);
-        double eMid = (eFirst + eLast) / 2.0;
-        gp_Pnt edgePt = adaptor.Value(eMid);
-
-        // Offset inward: cross the face normal with the edge tangent.
-        // The direction depends on edge orientation in the face — check by
-        // testing which side of the edge is inside the region.
-        gp_Vec tangent;
-        gp_Pnt unused;
-        adaptor.D1(eMid, unused, tangent);
-        gp_Vec normal(plane.Axis().Direction());
-        gp_Vec offset = normal.Crossed(tangent);
-        if (offset.Magnitude() < Precision::Confusion()) {
-            continue;
-        }
-        offset.Normalize();
-
-        // Use a small fraction of the edge length as offset distance
-        double edgeLen = eLast - eFirst;
-        double offsetDist = edgeLen * 1e-4;
-
-        // Try the offset direction; if it lands outside, flip it
-        gp_Pnt testPt = edgePt.Translated(offset * offsetDist);
-        BRepClass_FaceClassifier check(region, testPt, Precision::Confusion());
-        if (check.State() != TopAbs_IN) {
-            testPt = edgePt.Translated(offset * (-offsetDist));
         }
 
         int containCount = 0;
@@ -382,18 +308,18 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
             if (wf.IsNull()) {
                 continue;
             }
-            BRepClass_FaceClassifier classifier(wf, testPt, Precision::Confusion());
+            BRepClass_FaceClassifier classifier(wf, interiorPt, Precision::Confusion());
             if (classifier.State() == TopAbs_IN) {
                 ++containCount;
             }
         }
 
         if (containCount % 2 == 1) {
-            result.push_back(region);
+            result.push_back(face);
         }
     }
 
-    return true;
+    return !result.empty();
 }
 
 // ─── Phase 3: Non-planar face building ───────────────────────────────────────
@@ -401,32 +327,25 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
 void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                          std::vector<TopoDS_Shape>& result)
 {
-    // Sort wires by bounding box extent (largest first)
     struct WireBox
     {
         TopoDS_Wire wire;
-        Bnd_Box box;
         double extent;
     };
     std::vector<WireBox> sorted;
     sorted.reserve(wires.size());
     for (const auto& w : wires) {
-        WireBox wb;
-        wb.wire = w;
-        BRepBndLib::Add(w, wb.box);
-        wb.extent = wb.box.SquareExtent();
-        sorted.push_back(std::move(wb));
+        Bnd_Box box;
+        BRepBndLib::Add(w, box);
+        sorted.push_back({w, box.SquareExtent()});
     }
     std::stable_sort(sorted.begin(), sorted.end(),
                      [](const WireBox& a, const WireBox& b) { return a.extent > b.extent; });
 
-    // Build faces: largest wire first, smaller wires become holes if inside
     std::vector<TopoDS_Face> faces;
     for (const auto& wb : sorted) {
-        // Check if this wire is inside any existing face
         bool addedAsHole = false;
         for (auto& face : faces) {
-            // Get a point on the wire for hit testing
             TopExp_Explorer vExp(wb.wire, TopAbs_VERTEX);
             if (!vExp.More()) {
                 continue;
@@ -434,9 +353,6 @@ void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
             gp_Pnt testPt = BRep_Tool::Pnt(TopoDS::Vertex(vExp.Current()));
             BRepClass_FaceClassifier classifier(face, testPt, Precision::Confusion());
             if (classifier.State() == TopAbs_IN) {
-                // Wire is inside this face — add as hole.
-                // Try both orientations; BRepBuilderAPI_MakeFace requires
-                // the hole wire to have opposite orientation to the outer wire.
                 BRepBuilderAPI_MakeFace mf(face);
                 mf.Add(wb.wire);
                 if (!mf.IsDone()) {
@@ -453,10 +369,8 @@ void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         }
 
         if (!addedAsHole) {
-            // Not inside any face — create a new face
             BRepBuilderAPI_MakeFace mf(wb.wire);
             if (mf.IsDone()) {
-                // Validate
                 TopoDS_Face newFace = mf.Face();
                 BRepCheck_Analyzer checker(newFace);
                 if (!checker.IsValid()) {
@@ -489,7 +403,7 @@ void FaceMakerFishEye::Build_Essence()
     std::vector<TopoDS_Wire> wires = fuseOverlappingWires(myWires);
 
     // Phase 2: Try planar face building
-    if (buildPlanarFaces(wires, myShapesToReturn, planeSupplied ? &myPlane : nullptr)) {
+    if (buildPlanarFaces(wires, myShapesToReturn)) {
         return;
     }
 
