@@ -410,8 +410,7 @@ void FaceMakerBullseye::fuseOverlappingWires(std::vector<WireInfo>& wireInfos)
                 GProp_GProps props;
                 BRepGProp::SurfaceProperties(common.Shape(), props);
                 double commonArea = props.Mass();
-                if (commonArea > tol
-                    && commonArea < wireAreas[i] - tol
+                if (commonArea > tol && commonArea < wireAreas[i] - tol
                     && commonArea < wireAreas[j] - tol) {
                     overlaps[i] = true;
                     overlaps[j] = true;

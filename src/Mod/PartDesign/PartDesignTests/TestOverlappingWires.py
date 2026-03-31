@@ -11,22 +11,27 @@ import Sketcher
 def _add_rectangle_cw(sketch, x0, y0, x1, y1):
     """Add rectangle with CW edge order (top-left-bottom-right), matching GUI."""
     i = int(sketch.GeometryCount)
-    sketch.addGeometry([
-        Part.LineSegment(FreeCAD.Vector(x1, y1, 0), FreeCAD.Vector(x0, y1, 0)),
-        Part.LineSegment(FreeCAD.Vector(x0, y1, 0), FreeCAD.Vector(x0, y0, 0)),
-        Part.LineSegment(FreeCAD.Vector(x0, y0, 0), FreeCAD.Vector(x1, y0, 0)),
-        Part.LineSegment(FreeCAD.Vector(x1, y0, 0), FreeCAD.Vector(x1, y1, 0)),
-    ], False)
-    sketch.addConstraint([
-        Sketcher.Constraint("Coincident", i, 2, i + 1, 1),
-        Sketcher.Constraint("Coincident", i + 1, 2, i + 2, 1),
-        Sketcher.Constraint("Coincident", i + 2, 2, i + 3, 1),
-        Sketcher.Constraint("Coincident", i + 3, 2, i, 1),
-        Sketcher.Constraint("Horizontal", i),
-        Sketcher.Constraint("Horizontal", i + 2),
-        Sketcher.Constraint("Vertical", i + 1),
-        Sketcher.Constraint("Vertical", i + 3),
-    ])
+    sketch.addGeometry(
+        [
+            Part.LineSegment(FreeCAD.Vector(x1, y1, 0), FreeCAD.Vector(x0, y1, 0)),
+            Part.LineSegment(FreeCAD.Vector(x0, y1, 0), FreeCAD.Vector(x0, y0, 0)),
+            Part.LineSegment(FreeCAD.Vector(x0, y0, 0), FreeCAD.Vector(x1, y0, 0)),
+            Part.LineSegment(FreeCAD.Vector(x1, y0, 0), FreeCAD.Vector(x1, y1, 0)),
+        ],
+        False,
+    )
+    sketch.addConstraint(
+        [
+            Sketcher.Constraint("Coincident", i, 2, i + 1, 1),
+            Sketcher.Constraint("Coincident", i + 1, 2, i + 2, 1),
+            Sketcher.Constraint("Coincident", i + 2, 2, i + 3, 1),
+            Sketcher.Constraint("Coincident", i + 3, 2, i, 1),
+            Sketcher.Constraint("Horizontal", i),
+            Sketcher.Constraint("Horizontal", i + 2),
+            Sketcher.Constraint("Vertical", i + 1),
+            Sketcher.Constraint("Vertical", i + 3),
+        ]
+    )
 
 
 def _add_circle(sketch, cx, cy, radius):
@@ -36,11 +41,17 @@ def _add_circle(sketch, cx, cy, radius):
 
 
 def _make_rect_face(x0, y0, x1, y1):
-    return Part.Face(Part.makePolygon([
-        FreeCAD.Vector(x0, y0, 0), FreeCAD.Vector(x1, y0, 0),
-        FreeCAD.Vector(x1, y1, 0), FreeCAD.Vector(x0, y1, 0),
-        FreeCAD.Vector(x0, y0, 0),
-    ]))
+    return Part.Face(
+        Part.makePolygon(
+            [
+                FreeCAD.Vector(x0, y0, 0),
+                FreeCAD.Vector(x1, y0, 0),
+                FreeCAD.Vector(x1, y1, 0),
+                FreeCAD.Vector(x0, y1, 0),
+                FreeCAD.Vector(x0, y0, 0),
+            ]
+        )
+    )
 
 
 class TestOverlappingWires(unittest.TestCase):
@@ -207,9 +218,9 @@ class TestOverlappingWires(unittest.TestCase):
     def testOverlappingCirclesWithCircleHole(self):
         """Two overlapping circles with a small circle hole inside."""
         sk = self.Doc.addObject("Sketcher::SketchObject", "Sketch")
-        _add_circle(sk, 0, 0, 3)   # hole
+        _add_circle(sk, 0, 0, 3)  # hole
         _add_circle(sk, 0, 0, 20)  # outer 1
-        _add_circle(sk, 15, 0, 20) # outer 2, overlaps outer 1
+        _add_circle(sk, 15, 0, 20)  # outer 2, overlaps outer 1
         self.Doc.recompute()
         pad = self._makePad(sk)
         self.assertEqual(len(pad.Shape.Solids), 1)
@@ -265,10 +276,10 @@ class TestOverlappingWires(unittest.TestCase):
     def testOverlappingRectsWithHoleAndSeparate(self):
         """Overlapping rects with hole + separate rect: correct total volume."""
         sk = self.Doc.addObject("Sketcher::SketchObject", "Sketch")
-        _add_rectangle_cw(sk, -5, -5, 5, 5)     # hole inside large
+        _add_rectangle_cw(sk, -5, -5, 5, 5)  # hole inside large
         _add_rectangle_cw(sk, -20, -20, 20, 20)  # large
-        _add_rectangle_cw(sk, 10, 10, 30, 30)    # overlaps large
-        _add_rectangle_cw(sk, 50, 0, 60, 10)     # separate
+        _add_rectangle_cw(sk, 10, 10, 30, 30)  # overlaps large
+        _add_rectangle_cw(sk, 50, 0, 60, 10)  # separate
         self.Doc.recompute()
         pad = self._makePad(sk)
         for s in pad.Shape.Solids:
