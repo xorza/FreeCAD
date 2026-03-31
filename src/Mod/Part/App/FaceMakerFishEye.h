@@ -26,21 +26,24 @@
 
 #include "FaceMaker.h"
 
+#include <gp_Pln.hxx>
 #include <Mod/Part/PartGlobal.h>
 
 namespace Part
 {
 
 /**
- * @brief Unified face maker that handles all planar and curved face cases.
+ * @brief Unified face maker that handles all planar face cases.
  *
  * Handles:
  * - Nested wires (outer with holes with islands, like Bullseye)
- * - Overlapping/crossing wires (splits at intersections, finds all bounded regions)
- * - Curved surfaces (not just planar faces)
+ * - Overlapping/crossing wires (fuses them before nesting)
+ * - Curved surfaces (delegates to Cheese when needed)
  *
- * This replaces the waterfall pattern of trying Bullseye -> Cheese -> Simple
- * with a single algorithm that handles all cases correctly.
+ * Algorithm:
+ * 1. Detect partially overlapping wires using BRepAlgoAPI_Common
+ * 2. Fuse overlapping groups into merged outline wires
+ * 3. Delegate the resulting non-overlapping wires to FaceMakerBullseye
  */
 class PartExport FaceMakerFishEye: public FaceMakerPublic
 {
@@ -49,9 +52,14 @@ class PartExport FaceMakerFishEye: public FaceMakerPublic
 public:
     std::string getUserFriendlyName() const override;
     std::string getBriefExplanation() const override;
+    void setPlane(const gp_Pln& plane) override;
 
 protected:
     void Build_Essence() override;
+
+private:
+    gp_Pln myPlane;
+    bool planeSupplied {false};
 };
 
 }  // namespace Part
