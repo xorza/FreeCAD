@@ -73,7 +73,24 @@ void FaceMakerFishEye::setPlane(const gp_Pln& plane)
 namespace
 {
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
+{
+    try {
+        BRepBuilderAPI_MakeFace mf(w);
+        if (mf.IsDone()) {
+            return mf.Face();
+        }
+    }
+    catch (...) {
+    }
+    return {};
+}
+
+// ─── Phase 1: Fuse overlapping wires ─────────────────────────────────────────
+//
+// Detect partial overlaps (bounding box pre-filter + BRepAlgoAPI_Common),
+// group with union-find, fuse each group via N-way General Fuse,
+// extract outer wires from the fused result.
 
 struct WireFace
 {
@@ -87,19 +104,6 @@ struct WireFace
         return !face.IsNull();
     }
 };
-
-TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
-{
-    try {
-        BRepBuilderAPI_MakeFace mf(w);
-        if (mf.IsDone()) {
-            return mf.Face();
-        }
-    }
-    catch (...) {
-    }
-    return {};
-}
 
 double shapeArea(const TopoDS_Shape& s)
 {
@@ -135,8 +139,6 @@ void unite(std::vector<int>& parent, int a, int b)
 {
     parent[findRoot(parent, a)] = findRoot(parent, b);
 }
-
-// ─── Phase 1: Fuse overlapping wires ─────────────────────────────────────────
 
 std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& inputWires)
 {
@@ -207,7 +209,6 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
         fuser.SetArguments(toFuse);
         fuser.Build();
         if (!fuser.IsDone()) {
-            FC_WARN("FaceMakerFishEye: failed to fuse overlapping wires");
             for (size_t idx : indices) {
                 result.push_back(wfs[idx].wire);
             }
@@ -215,8 +216,7 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
         }
 
         for (TopExp_Explorer fExp(fuser.Shape(), TopAbs_FACE); fExp.More(); fExp.Next()) {
-            TopoDS_Face fusedFace = TopoDS::Face(fExp.Current());
-            TopoDS_Wire outerWire = BRepTools::OuterWire(fusedFace);
+            TopoDS_Wire outerWire = BRepTools::OuterWire(TopoDS::Face(fExp.Current()));
             if (!outerWire.IsNull()) {
                 result.push_back(outerWire);
             }
@@ -226,12 +226,16 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
     return result;
 }
 
-// ─── Phase 2: Planar face building via BOPAlgo_Tools::WiresToFaces ───────────
+// ─── Phase 2: Planar face building ──────────────────────────────────────────
+//
+// Takes non-overlapping wires (output of Phase 1), splits edges,
+// builds all face regions via WiresToFaces, then applies even-odd
+// classification against original (pre-fuse) wires.
 
 bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                       std::vector<TopoDS_Shape>& result)
 {
-    // Collect all edges from input wires
+    // Collect all edges
     TopTools_ListOfShape edgeList;
     for (const auto& w : wires) {
         for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
@@ -242,7 +246,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         return false;
     }
 
-    // Split edges at mutual intersections via General Fuse
+    // N-way General Fuse: split all edges at all mutual intersections
     BRepAlgoAPI_BuilderAlgo splitter;
     splitter.SetArguments(edgeList);
     splitter.SetRunParallel(true);
@@ -252,7 +256,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         return false;
     }
 
-    // Collect split edges into a compound for EdgesToWires
+    // Collect split edges into a compound
     BRep_Builder builder;
     TopoDS_Compound edgeCompound;
     builder.MakeCompound(edgeCompound);
@@ -260,32 +264,28 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         builder.Add(edgeCompound, exp.Current());
     }
 
-    // EdgesToWires: connect split edges into closed wires
+    // EdgesToWires → WiresToFaces: assembles wires, finds planes, builds
+    // pcurves, runs BOPAlgo_BuilderFace with hole classification
     TopoDS_Shape wireShape;
     BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
 
-    // WiresToFaces: build planar faces with proper hole nesting.
-    // This handles plane detection, pcurve building, BOPAlgo_BuilderFace,
-    // and hole-to-face assignment in one call.
     TopoDS_Shape faceShape;
     if (!BOPAlgo_Tools::WiresToFaces(wireShape, faceShape)) {
         return false;
     }
 
-    // Collect all resulting faces
+    // Collect all resulting face regions
     std::vector<TopoDS_Face> allFaces;
     for (TopExp_Explorer exp(faceShape, TopAbs_FACE); exp.More(); exp.Next()) {
         allFaces.push_back(TopoDS::Face(exp.Current()));
     }
-
     if (allFaces.empty()) {
         return false;
     }
 
-    // BOPAlgo_BuilderFace (inside WiresToFaces) produces all bounded regions
-    // with proper hole assignment. But it returns ALL growth faces including
-    // islands inside holes. Apply even-odd nesting: keep faces whose interior
-    // point is inside an odd number of original input wires.
+    // Even-odd nesting: BOPAlgo_BuilderFace returns ALL growth faces including
+    // islands inside holes. Keep only faces whose interior point is inside an
+    // odd number of original input wires.
     Handle(IntTools_Context) ctx = new IntTools_Context();
     std::vector<TopoDS_Face> wireFaces;
     wireFaces.reserve(wires.size());
@@ -294,11 +294,9 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     }
 
     for (const auto& face : allFaces) {
-        // Get a robust interior point using OCCT's hatcher
         gp_Pnt interiorPt;
         gp_Pnt2d interiorPt2d;
         if (BOPTools_AlgoTools3D::PointInFace(face, interiorPt, interiorPt2d, ctx) != 0) {
-            // Fallback: keep the face if we can't get an interior point
             result.push_back(face);
             continue;
         }
@@ -322,7 +320,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     return !result.empty();
 }
 
-// ─── Phase 3: Non-planar face building ───────────────────────────────────────
+// ─── Non-planar fallback ─────────────────────────────────────────────────────
 
 void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                          std::vector<TopoDS_Shape>& result)
@@ -402,7 +400,7 @@ void FaceMakerFishEye::Build_Essence()
     // Phase 1: Fuse overlapping wires into merged outlines
     std::vector<TopoDS_Wire> wires = fuseOverlappingWires(myWires);
 
-    // Phase 2: Try planar face building
+    // Phase 2: Planar face building with even-odd against original wires
     if (buildPlanarFaces(wires, myShapesToReturn)) {
         return;
     }
