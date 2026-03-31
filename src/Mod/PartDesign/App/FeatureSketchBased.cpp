@@ -27,6 +27,7 @@
 #include <BRep_Tool.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -66,6 +67,164 @@
 FC_LOG_LEVEL_INIT("PartDesign", true, true);
 
 using namespace PartDesign;
+using Part::TopoShape;
+
+// Build a single face from wires by classifying them as outer boundaries
+// or holes, then fusing outer faces and cutting hole faces.
+// A wire is classified as a "hole" if its face is fully inside exactly
+// one other wire's face and doesn't overlap with any other wire.
+static TopoShape fuseWireFaces(const TopoShape& wireShape,
+                               const std::vector<TopoShape>& wires)
+{
+    // Make a face from each closed wire
+    std::vector<TopoDS_Face> wireFaces;
+    std::vector<Bnd_Box> wireBounds;
+    wireFaces.reserve(wires.size());
+    wireBounds.reserve(wires.size());
+
+    for (const auto& w : wires) {
+        TopoDS_Wire wire = TopoDS::Wire(w.getShape());
+        if (wire.IsNull() || !BRep_Tool::IsClosed(wire)) {
+            continue;
+        }
+        try {
+            BRepBuilderAPI_MakeFace mf(wire);
+            if (mf.IsDone()) {
+                wireFaces.push_back(mf.Face());
+                Bnd_Box box;
+                BRepBndLib::Add(mf.Face(), box);
+                wireBounds.push_back(box);
+            }
+        }
+        catch (...) {
+            continue;
+        }
+    }
+
+    if (wireFaces.empty()) {
+        return wireShape.makeElementFace();
+    }
+    if (wireFaces.size() == 1) {
+        // Single wire — just use it directly
+        return wireShape.makeElementFace();
+    }
+
+    // Classify each wire face as outer or hole using containment depth.
+    // Count how many other non-overlapping wire faces fully contain each face.
+    // Even depth = outer (solid), odd depth = hole (even-odd fill rule).
+    // Overlapping wires (those that partially intersect others) are always outer.
+    std::vector<bool> isHole(wireFaces.size(), false);
+    double tol = Precision::Confusion();
+
+    // Compute areas for each face
+    std::vector<double> areas(wireFaces.size());
+    for (size_t i = 0; i < wireFaces.size(); ++i) {
+        GProp_GProps props;
+        BRepGProp::SurfaceProperties(wireFaces[i], props);
+        areas[i] = props.Mass();
+    }
+
+    // Detect which faces partially overlap with others.
+    // "Partial overlap" = the common area is less than either face's area
+    // (i.e. the wires actually cross, not one fully inside the other).
+    std::vector<bool> overlaps(wireFaces.size(), false);
+    for (size_t i = 0; i < wireFaces.size(); ++i) {
+        for (size_t j = i + 1; j < wireFaces.size(); ++j) {
+            if (wireBounds[i].IsOut(wireBounds[j])) {
+                continue;
+            }
+            BRepAlgoAPI_Common common(wireFaces[i], wireFaces[j]);
+            if (common.IsDone() && !common.Shape().IsNull()) {
+                GProp_GProps props;
+                BRepGProp::SurfaceProperties(common.Shape(), props);
+                double commonArea = props.Mass();
+                // Partial overlap: common area is significant but less than
+                // either face (wires cross each other)
+                if (commonArea > tol
+                    && commonArea < areas[i] - tol
+                    && commonArea < areas[j] - tol) {
+                    overlaps[i] = true;
+                    overlaps[j] = true;
+                }
+            }
+        }
+    }
+
+    // Count containment depth for non-overlapping faces.
+    // Overlapping wires are always outer and count as a single container
+    // collectively (not individually) when determining nesting depth.
+    bool hasAnyOverlap = false;
+    for (size_t i = 0; i < wireFaces.size(); ++i) {
+        if (overlaps[i]) {
+            hasAnyOverlap = true;
+            continue;  // Overlapping faces are always outer
+        }
+        int containmentDepth = 0;
+        bool insideOverlapping = false;
+        double xmin_i, ymin_i, zmin_i, xmax_i, ymax_i, zmax_i;
+        wireBounds[i].Get(xmin_i, ymin_i, zmin_i, xmax_i, ymax_i, zmax_i);
+
+        for (size_t j = 0; j < wireFaces.size(); ++j) {
+            if (i == j) {
+                continue;
+            }
+            double xmin_j, ymin_j, zmin_j, xmax_j, ymax_j, zmax_j;
+            wireBounds[j].Get(xmin_j, ymin_j, zmin_j, xmax_j, ymax_j, zmax_j);
+
+            if (xmin_j <= xmin_i - tol && xmax_j >= xmax_i + tol
+                && ymin_j <= ymin_i - tol && ymax_j >= ymax_i + tol) {
+                if (overlaps[j]) {
+                    // All overlapping containers count as one
+                    insideOverlapping = true;
+                }
+                else {
+                    ++containmentDepth;
+                }
+            }
+        }
+        // Overlapping containers collectively count as one nesting level
+        if (insideOverlapping) {
+            ++containmentDepth;
+        }
+        // Even-odd rule: odd depth = hole
+        isHole[i] = (containmentDepth % 2 == 1);
+    }
+
+    // Collect outer and hole faces as TopoShapes
+    std::vector<TopoShape> outerShapes;
+    std::vector<TopoShape> holeShapes;
+    for (size_t i = 0; i < wireFaces.size(); ++i) {
+        if (isHole[i]) {
+            holeShapes.emplace_back(wireFaces[i]);
+        }
+        else {
+            outerShapes.emplace_back(wireFaces[i]);
+        }
+    }
+
+    if (outerShapes.empty()) {
+        return wireShape.makeElementFace();
+    }
+
+    // If no overlapping wires, fall back to Bullseye which handles
+    // pure nesting (concentric circles, rect with hole) correctly.
+    if (!hasAnyOverlap) {
+        return wireShape.makeElementFace();
+    }
+
+    // Fuse outer faces (only relevant when wires overlap)
+    TopoShape result = outerShapes[0];
+    for (size_t i = 1; i < outerShapes.size(); ++i) {
+        result = result.makeElementFuse(outerShapes[i]);
+    }
+
+    // Cut hole faces
+    for (const auto& hole : holeShapes) {
+        result = result.makeElementCut(hole);
+    }
+
+    return result;
+}
 
 PROPERTY_SOURCE(PartDesign::ProfileBased, PartDesign::FeatureAddSub)
 
@@ -308,7 +467,15 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                     }
                     if (!shape.isNull()) {
                         if (AllowMultiFace.getValue()) {
-                            shape = shape.makeElementFace();  // default to use FaceMakerBullseye
+                            // Build faces from wires, then classify as outer/hole and
+                            // fuse/cut to produce correct geometry for overlapping wires.
+                            auto topoWires = shape.getSubTopoShapes(TopAbs_WIRE);
+                            if (topoWires.empty()) {
+                                shape = shape.makeElementFace();
+                            }
+                            else {
+                                shape = fuseWireFaces(shape, topoWires);
+                            }
                         }
                         else {
                             shape = shape.makeElementFace(nullptr, "Part::FaceMakerCheese");
