@@ -87,8 +87,6 @@ protected:
         bool operator<(const WireInfo& other) const;
     };
 
-    static void fuseOverlappingWires(std::vector<WireInfo>& wireInfos);
-
     /**
      * @brief The FaceDriller class is similar to BRepBuilderAPI_MakeFace,
      * except that it is tolerant to wire orientation (wires are oriented as

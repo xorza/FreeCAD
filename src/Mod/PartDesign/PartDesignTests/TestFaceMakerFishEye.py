@@ -54,11 +54,11 @@ def _make_rect_face(x0, y0, x1, y1):
     )
 
 
-class TestOverlappingWires(unittest.TestCase):
-    """Test that Pad/Pocket correctly handles overlapping sketch wires.
+class TestFaceMakerFishEye(unittest.TestCase):
+    """Test FaceMakerFishEye: unified face maker for overlapping wires,
+    nested holes, and curved surfaces.
 
-    Uses CW rectangle edge order matching the GUI's DrawSketchHandler to
-    expose winding-dependent bugs in FaceMakerBullseye.
+    Uses CW rectangle edge order matching the GUI's DrawSketchHandler.
     """
 
     def setUp(self):

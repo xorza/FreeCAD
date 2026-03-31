@@ -25,13 +25,9 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepAdaptor_Surface.hxx>
-#include <BRepAlgoAPI_BuilderAlgo.hxx>
-#include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
-#include <BRepGProp.hxx>
-#include <GProp_GProps.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <Geom_Plane.hxx>
@@ -120,11 +116,6 @@ void FaceMakerBullseye::Build_Essence()
         }
         wireInfos.emplace_back(w, box);
     }
-
-    // Fuse overlapping wires before classification.
-    // When wires cross each other (e.g. two overlapping rectangles), the
-    // hit-test below cannot classify them correctly.
-    fuseOverlappingWires(wireInfos);
 
     // Sort wires by length of diagonal of bounding box.
     std::stable_sort(wireInfos.begin(), wireInfos.end());
@@ -364,96 +355,6 @@ int FaceMakerBullseye::FaceDriller::getWireDirection(const gp_Pln& plane, const 
     normal_co ^= it.Value().Orientation() != wire.Orientation();
 
     return normal_co ? 1 : -1;
-}
-
-void FaceMakerBullseye::fuseOverlappingWires(std::vector<WireInfo>& wireInfos)
-{
-    if (wireInfos.size() < 2) {
-        return;
-    }
-
-    double tol = Precision::Confusion();
-
-    // Make a face from each wire and compute areas
-    std::vector<TopoDS_Face> wireFaces(wireInfos.size());
-    std::vector<double> wireAreas(wireInfos.size());
-    for (size_t i = 0; i < wireInfos.size(); ++i) {
-        try {
-            BRepBuilderAPI_MakeFace mf(TopoDS::Wire(wireInfos[i].wire.getShape()));
-            if (mf.IsDone()) {
-                wireFaces[i] = mf.Face();
-                GProp_GProps props;
-                BRepGProp::SurfaceProperties(wireFaces[i], props);
-                wireAreas[i] = props.Mass();
-            }
-        }
-        catch (...) {
-            continue;
-        }
-    }
-
-    // Detect partial overlaps (wires cross, not one fully inside another)
-    std::vector<bool> overlaps(wireInfos.size(), false);
-    for (size_t i = 0; i < wireInfos.size(); ++i) {
-        if (wireFaces[i].IsNull()) {
-            continue;
-        }
-        for (size_t j = i + 1; j < wireInfos.size(); ++j) {
-            if (wireFaces[j].IsNull()) {
-                continue;
-            }
-            if (wireInfos[i].bound.IsOut(wireInfos[j].bound)) {
-                continue;
-            }
-            BRepAlgoAPI_Common common(wireFaces[i], wireFaces[j]);
-            if (common.IsDone() && !common.Shape().IsNull()) {
-                GProp_GProps props;
-                BRepGProp::SurfaceProperties(common.Shape(), props);
-                double commonArea = props.Mass();
-                if (commonArea > tol && commonArea < wireAreas[i] - tol
-                    && commonArea < wireAreas[j] - tol) {
-                    overlaps[i] = true;
-                    overlaps[j] = true;
-                }
-            }
-        }
-    }
-
-    // Fuse all overlapping faces in one operation
-    TopTools_ListOfShape toFuse;
-    for (size_t i = 0; i < wireInfos.size(); ++i) {
-        if (overlaps[i] && !wireFaces[i].IsNull()) {
-            toFuse.Append(wireFaces[i]);
-        }
-    }
-    if (toFuse.Size() < 2) {
-        return;
-    }
-
-    BRepAlgoAPI_BuilderAlgo fuser;
-    fuser.SetArguments(toFuse);
-    fuser.Build();
-    if (!fuser.IsDone()) {
-        return;
-    }
-    const TopoDS_Shape& fused = fuser.Shape();
-
-    // Replace overlapping wires with fused result wire(s)
-    std::vector<WireInfo> newInfos;
-    for (size_t i = 0; i < wireInfos.size(); ++i) {
-        if (!overlaps[i]) {
-            newInfos.push_back(wireInfos[i]);
-        }
-    }
-    for (TopExp_Explorer exp(fused, TopAbs_WIRE); exp.More(); exp.Next()) {
-        TopoShape ts(exp.Current());
-        Bnd_Box box;
-        BRepBndLib::AddOptimal(exp.Current(), box, Standard_False);
-        if (!box.IsVoid()) {
-            newInfos.emplace_back(ts, box);
-        }
-    }
-    wireInfos = std::move(newInfos);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////

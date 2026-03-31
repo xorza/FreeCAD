@@ -58,7 +58,7 @@ set(PartDesign_TestScripts
     PartDesignTests/TestTopologicalNamingProblem.py
     PartDesignTests/TestInvoluteGear.py
     PartDesignTests/TestSketch.py
-    PartDesignTests/TestOverlappingWires.py
+    PartDesignTests/TestFaceMakerFishEye.py
 )
 
 if(BUILD_GUI)
