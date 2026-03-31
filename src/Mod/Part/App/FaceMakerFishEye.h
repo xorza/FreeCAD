@@ -33,17 +33,19 @@ namespace Part
 {
 
 /**
- * @brief Unified face maker that handles all planar face cases.
+ * @brief Unified face maker that handles all face cases.
  *
  * Handles:
- * - Nested wires (outer with holes with islands, like Bullseye)
- * - Overlapping/crossing wires (fuses them before nesting)
- * - Curved surfaces (delegates to Cheese when needed)
+ * - Nested wires (outer with holes with islands)
+ * - Overlapping/crossing wires (fuses them into union outlines)
+ * - Curved surfaces (non-planar wire fallback)
  *
  * Algorithm:
- * 1. Detect partially overlapping wires using BRepAlgoAPI_Common
- * 2. Fuse overlapping groups into merged outline wires
- * 3. Delegate the resulting non-overlapping wires to FaceMakerBullseye
+ * 1. Detect partially overlapping wires, fuse each group
+ * 2. Planar path: split edges at intersections, BOPAlgo_BuilderFace
+ * 3. Non-planar fallback: BRepBuilderAPI_MakeFace with hole classification
+ *
+ * Self-contained — no dependency on other FaceMaker implementations.
  */
 class PartExport FaceMakerFishEye: public FaceMakerPublic
 {

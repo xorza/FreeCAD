@@ -213,3 +213,18 @@ class TestFaceMakerFishEye(unittest.TestCase):
         main_area = sum(f.Area for f in large.fuse(overlap).cut(hole).Faces)
         separate_area = 10 * 10
         self.assertAlmostEqual(_total_area(result), main_area + separate_area, delta=1.0)
+
+    # ------------------------------------------------------------------
+    # Non-planar (curved surface) — Cheese fallback
+    # ------------------------------------------------------------------
+
+    def testNonPlanarWire(self):
+        """Wire cut from a cylinder: produces a valid curved face."""
+        # Make a cylinder and extract a closed wire from one of its faces
+        cyl = Part.makeCylinder(10, 20)
+        # The lateral face has a closed wire
+        lateral = [f for f in cyl.Faces if f.Surface.TypeId == "Part::GeomCylinder"][0]
+        wire = lateral.OuterWire
+        result = _make_faces([wire])
+        self.assertEqual(len(result.Faces), 1)
+        self.assertTrue(result.Faces[0].Area > 0)
