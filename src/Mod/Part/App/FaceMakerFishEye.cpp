@@ -89,8 +89,9 @@ TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
 // ─── Phase 1: Fuse overlapping wires ─────────────────────────────────────────
 //
 // Detect partial overlaps (bounding box pre-filter + BRepAlgoAPI_Common),
-// group with union-find, fuse each group via N-way General Fuse,
-// extract outer wires from the fused result.
+// group with union-find, fuse each group, extract outer wires.
+// Full containment (hole inside outer) is NOT fused — it's preserved
+// for even-odd nesting in Phase 2.
 
 struct WireFace
 {
@@ -228,53 +229,34 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
 
 // ─── Phase 2: Planar face building ──────────────────────────────────────────
 //
-// Takes non-overlapping wires (output of Phase 1), splits edges,
-// builds all face regions via WiresToFaces, then applies even-odd
-// classification against original (pre-fuse) wires.
+// EdgesToWires handles edge splitting internally. WiresToFaces builds all
+// face regions with hole nesting. Even-odd classification uses cached
+// IntTools_Context for fast 2D point-in-polygon tests.
 
 bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                       std::vector<TopoDS_Shape>& result)
 {
-    // Collect all edges
-    TopTools_ListOfShape edgeList;
-    for (const auto& w : wires) {
-        for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
-            edgeList.Append(exp.Current());
-        }
-    }
-    if (edgeList.IsEmpty()) {
-        return false;
-    }
-
-    // N-way General Fuse: split all edges at all mutual intersections
-    BRepAlgoAPI_BuilderAlgo splitter;
-    splitter.SetArguments(edgeList);
-    splitter.SetRunParallel(true);
-    splitter.SetNonDestructive(Standard_True);
-    splitter.Build();
-    if (!splitter.IsDone()) {
-        return false;
-    }
-
-    // Collect split edges into a compound
+    // Collect all edges into a compound
     BRep_Builder builder;
     TopoDS_Compound edgeCompound;
     builder.MakeCompound(edgeCompound);
-    for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-        builder.Add(edgeCompound, exp.Current());
+    for (const auto& w : wires) {
+        for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+            builder.Add(edgeCompound, exp.Current());
+        }
     }
 
-    // EdgesToWires → WiresToFaces: assembles wires, finds planes, builds
-    // pcurves, runs BOPAlgo_BuilderFace with hole classification
+    // EdgesToWires: splits edges at intersections and assembles closed wires
     TopoDS_Shape wireShape;
     BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
 
+    // WiresToFaces: finds planes, builds pcurves, runs BOPAlgo_BuilderFace
     TopoDS_Shape faceShape;
     if (!BOPAlgo_Tools::WiresToFaces(wireShape, faceShape)) {
         return false;
     }
 
-    // Collect all resulting face regions
+    // Collect all face regions
     std::vector<TopoDS_Face> allFaces;
     for (TopExp_Explorer exp(faceShape, TopAbs_FACE); exp.More(); exp.Next()) {
         allFaces.push_back(TopoDS::Face(exp.Current()));
@@ -283,9 +265,9 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         return false;
     }
 
-    // Even-odd nesting: BOPAlgo_BuilderFace returns ALL growth faces including
-    // islands inside holes. Keep only faces whose interior point is inside an
-    // odd number of original input wires.
+    // Even-odd nesting: keep faces whose interior point is inside an
+    // odd number of input wires. Uses IntTools_Context for cached
+    // 2D point-in-polygon classification.
     Handle(IntTools_Context) ctx = new IntTools_Context();
     std::vector<TopoDS_Face> wireFaces;
     wireFaces.reserve(wires.size());
@@ -306,8 +288,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
             if (wf.IsNull()) {
                 continue;
             }
-            BRepClass_FaceClassifier classifier(wf, interiorPt, Precision::Confusion());
-            if (classifier.State() == TopAbs_IN) {
+            if (ctx->IsPointInFace(interiorPt, wf, Precision::Confusion())) {
                 ++containCount;
             }
         }
@@ -397,10 +378,10 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
-    // Phase 1: Fuse overlapping wires into merged outlines
+    // Phase 1: Fuse overlapping wires (union semantics for crossing wires)
     std::vector<TopoDS_Wire> wires = fuseOverlappingWires(myWires);
 
-    // Phase 2: Planar face building with even-odd against original wires
+    // Phase 2: Planar face building with even-odd nesting
     if (buildPlanarFaces(wires, myShapesToReturn)) {
         return;
     }
