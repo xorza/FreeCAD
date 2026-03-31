@@ -32,7 +32,6 @@
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
-#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass_FaceClassifier.hxx>
@@ -44,7 +43,6 @@
 #include <GeomAdaptor_Surface.hxx>
 #include <GProp_GProps.hxx>
 #include <Precision.hxx>
-#include <ShapeAnalysis.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
@@ -355,17 +353,29 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         double eMid = (eFirst + eLast) / 2.0;
         gp_Pnt edgePt = adaptor.Value(eMid);
 
-        // Offset inward: cross the face normal with the edge tangent
+        // Offset inward: cross the face normal with the edge tangent.
+        // The direction depends on edge orientation in the face — check by
+        // testing which side of the edge is inside the region.
         gp_Vec tangent;
         gp_Pnt unused;
         adaptor.D1(eMid, unused, tangent);
-        gp_Vec normal = gp_Vec(plane.Axis().Direction());
-        gp_Vec inward = normal.Crossed(tangent);
-        if (inward.Magnitude() > Precision::Confusion()) {
-            inward.Normalize();
+        gp_Vec normal(plane.Axis().Direction());
+        gp_Vec offset = normal.Crossed(tangent);
+        if (offset.Magnitude() < Precision::Confusion()) {
+            continue;
         }
-        // Small offset to get strictly inside the face
-        gp_Pnt testPt = edgePt.Translated(inward * Precision::Confusion() * 100);
+        offset.Normalize();
+
+        // Use a small fraction of the edge length as offset distance
+        double edgeLen = eLast - eFirst;
+        double offsetDist = edgeLen * 1e-4;
+
+        // Try the offset direction; if it lands outside, flip it
+        gp_Pnt testPt = edgePt.Translated(offset * offsetDist);
+        BRepClass_FaceClassifier check(region, testPt, Precision::Confusion());
+        if (check.State() != TopAbs_IN) {
+            testPt = edgePt.Translated(offset * (-offsetDist));
+        }
 
         int containCount = 0;
         for (const auto& wf : wireFaces) {
@@ -424,25 +434,16 @@ void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
             gp_Pnt testPt = BRep_Tool::Pnt(TopoDS::Vertex(vExp.Current()));
             BRepClass_FaceClassifier classifier(face, testPt, Precision::Confusion());
             if (classifier.State() == TopAbs_IN) {
-                // Wire is inside this face — add as hole
+                // Wire is inside this face — add as hole.
+                // Try both orientations; BRepBuilderAPI_MakeFace requires
+                // the hole wire to have opposite orientation to the outer wire.
                 BRepBuilderAPI_MakeFace mf(face);
-                TopoDS_Wire holeWire = wb.wire;
-                // Check orientation: hole wires must have opposite orientation to outer
-                TopoDS_Wire outerWire = BRepTools::OuterWire(face);
-                BRepAdaptor_Surface adapt(face);
-                if (adapt.GetType() == GeomAbs_Plane) {
-                    gp_Dir axis = adapt.Plane().Axis().Direction();
-                    BRepBuilderAPI_MakeFace testFace(holeWire);
-                    if (testFace.IsDone()) {
-                        BRepAdaptor_Surface innerAdapt(testFace.Face());
-                        if (innerAdapt.GetType() == GeomAbs_Plane) {
-                            if (axis.Dot(innerAdapt.Plane().Axis().Direction()) > 0) {
-                                holeWire.Reverse();
-                            }
-                        }
-                    }
+                mf.Add(wb.wire);
+                if (!mf.IsDone()) {
+                    TopoDS_Wire reversed = TopoDS::Wire(wb.wire.Reversed());
+                    mf.Init(face);
+                    mf.Add(reversed);
                 }
-                mf.Add(holeWire);
                 if (mf.IsDone()) {
                     face = mf.Face();
                     addedAsHole = true;
