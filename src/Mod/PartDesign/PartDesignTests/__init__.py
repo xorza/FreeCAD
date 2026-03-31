@@ -13,6 +13,7 @@ from . import TestLoft
 from . import TestMirrored
 from . import TestMultiTransform
 from . import TestPad
+from . import TestOverlappingWires
 from . import TestPipe
 from . import TestPocket
 from . import TestPolarPattern
