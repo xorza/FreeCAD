@@ -273,7 +273,7 @@ class TestSketchInternalFaces(unittest.TestCase):
     # ==================================================================
 
     def testTwoOverlappingCircles(self):
-        """Two overlapping circles: 3 non-overlapping faces (Venn diagram)."""
+        """Two overlapping circles: 3 faces (Venn diagram), no overlap between faces."""
         sk = self._make_sketch()
         r = 10
         d = 12
@@ -290,7 +290,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertFalse(faces_overlap(faces))
 
     def testTwoOverlappingRectangles(self):
-        """Two overlapping rectangles: 3 non-overlapping faces, total area = union."""
+        """Two overlapping rectangles: 3 faces, total area = union."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
         add_rectangle(sk, 5, 5, 15, 15)
@@ -420,7 +420,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
 
     def testCrossPattern(self):
-        """Two perpendicular overlapping rectangles (+ shape): 5 non-overlapping faces."""
+        """Two perpendicular overlapping rectangles (+ shape): 5 faces."""
         sk = self._make_sketch()
         add_rectangle(sk, -5, -15, 5, 15)  # vertical bar
         add_rectangle(sk, -15, -5, 15, 5)  # horizontal bar
@@ -505,7 +505,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertGreaterEqual(len(faces), 9, "Four overlapping circles should produce >= 9 faces")
 
     # ==================================================================
-    # 10. Element naming
+    # 11. Element naming
     # ==================================================================
 
     def testInternalShapeHasEdgeNames(self):
