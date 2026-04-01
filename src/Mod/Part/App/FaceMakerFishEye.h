@@ -43,9 +43,7 @@ namespace Part
  * Algorithm:
  * 1. Detect partially overlapping wires, fuse each group
  * 2. Planar path: split edges at intersections, BOPAlgo_BuilderFace
- * 3. Non-planar fallback: BRepBuilderAPI_MakeFace with hole classification
- *
- * Self-contained — no dependency on other FaceMaker implementations.
+ * 3. Non-planar fallback: delegates to FaceMakerCheese
  */
 class PartExport FaceMakerFishEye: public FaceMakerPublic
 {

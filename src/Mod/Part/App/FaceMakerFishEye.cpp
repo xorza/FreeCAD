@@ -23,25 +23,22 @@
  ***************************************************************************/
 
 #include "FaceMakerFishEye.h"
+#include "FaceMakerCheese.h"
 
 #include <BOPAlgo_Tools.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
-#include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
-#include <BRepCheck_Analyzer.hxx>
-#include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
 #include <BRepTools.hxx>
 #include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <IntTools_Context.hxx>
 #include <Precision.hxx>
-#include <ShapeFix_Shape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 
@@ -301,70 +298,18 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     return !result.empty();
 }
 
-// ─── Non-planar fallback ─────────────────────────────────────────────────────
+// ─── Non-planar fallback: delegate to FaceMakerCheese ────────────────────────
 
 void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                          std::vector<TopoDS_Shape>& result)
 {
-    struct WireBox
-    {
-        TopoDS_Wire wire;
-        double extent;
-    };
-    std::vector<WireBox> sorted;
-    sorted.reserve(wires.size());
+    FaceMakerCheese cheese;
     for (const auto& w : wires) {
-        Bnd_Box box;
-        BRepBndLib::Add(w, box);
-        sorted.push_back({w, box.SquareExtent()});
+        cheese.addWire(w);
     }
-    std::stable_sort(sorted.begin(), sorted.end(),
-                     [](const WireBox& a, const WireBox& b) { return a.extent > b.extent; });
-
-    std::vector<TopoDS_Face> faces;
-    for (const auto& wb : sorted) {
-        bool addedAsHole = false;
-        for (auto& face : faces) {
-            TopExp_Explorer vExp(wb.wire, TopAbs_VERTEX);
-            if (!vExp.More()) {
-                continue;
-            }
-            gp_Pnt testPt = BRep_Tool::Pnt(TopoDS::Vertex(vExp.Current()));
-            BRepClass_FaceClassifier classifier(face, testPt, Precision::Confusion());
-            if (classifier.State() == TopAbs_IN) {
-                BRepBuilderAPI_MakeFace mf(face);
-                mf.Add(wb.wire);
-                if (!mf.IsDone()) {
-                    TopoDS_Wire reversed = TopoDS::Wire(wb.wire.Reversed());
-                    mf.Init(face);
-                    mf.Add(reversed);
-                }
-                if (mf.IsDone()) {
-                    face = mf.Face();
-                    addedAsHole = true;
-                    break;
-                }
-            }
-        }
-
-        if (!addedAsHole) {
-            BRepBuilderAPI_MakeFace mf(wb.wire);
-            if (mf.IsDone()) {
-                TopoDS_Face newFace = mf.Face();
-                BRepCheck_Analyzer checker(newFace);
-                if (!checker.IsValid()) {
-                    ShapeFix_Shape fix(newFace);
-                    fix.SetPrecision(Precision::Confusion());
-                    fix.Perform();
-                    newFace = TopoDS::Face(fix.Shape());
-                }
-                faces.push_back(newFace);
-            }
-        }
-    }
-
-    for (auto& f : faces) {
-        result.push_back(f);
+    cheese.Build();
+    for (TopExp_Explorer exp(cheese.Shape(), TopAbs_FACE); exp.More(); exp.Next()) {
+        result.push_back(exp.Current());
     }
 }
 
