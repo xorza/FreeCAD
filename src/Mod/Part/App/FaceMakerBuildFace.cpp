@@ -95,24 +95,22 @@ void Part::FaceMakerBuildFace::Build_Essence()
         splitEdges = edgeList;
     }
 
-    // Step 2b: Remove dangling edges — edges with a vertex of degree 1.
-    // These come from open wires that don't fully cross a region (incomplete
-    // intersections) and would create artifact faces at T-junctions in
-    // BuilderFace. Prune iteratively until no degree-1 vertices remain.
-    // Note: BOPAlgo_BuilderFace::PerformShapesToAvoid handles simple dangling
-    // endpoints (paired same-edge opposite orientation) but not T-junctions.
+    // Step 2b: Remove dangling edges — edges where a vertex has degree 1.
+    // Open wires that don't fully cross a region (incomplete intersections)
+    // leave free endpoints that would create artifact faces in BuilderFace.
+    // Prune iteratively to handle chains of dangling segments.
+    BRep_Builder builder;
+    TopoDS_Compound edgeCompound;
     {
-        BRep_Builder bb;
         bool changed = true;
         while (changed) {
             changed = false;
-            TopoDS_Compound compound;
-            bb.MakeCompound(compound);
+            builder.MakeCompound(edgeCompound);
             for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-                bb.Add(compound, it.Value());
+                builder.Add(edgeCompound, it.Value());
             }
             TopTools_IndexedDataMapOfShapeListOfShape vertexEdgeMap;
-            TopExp::MapShapesAndAncestors(compound, TopAbs_VERTEX, TopAbs_EDGE, vertexEdgeMap);
+            TopExp::MapShapesAndAncestors(edgeCompound, TopAbs_VERTEX, TopAbs_EDGE, vertexEdgeMap);
 
             TopTools_ListOfShape filtered;
             for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
@@ -142,19 +140,12 @@ void Part::FaceMakerBuildFace::Build_Essence()
         }
     }
 
-    // Step 3: Determine the plane
+    // Step 3: Determine the plane (reuses edgeCompound from Step 2b)
     gp_Pln plane;
     if (planeSupplied) {
         plane = myPlane;
     }
     else {
-        // Find a common plane from the edges
-        BRep_Builder builder;
-        TopoDS_Compound edgeCompound;
-        builder.MakeCompound(edgeCompound);
-        for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-            builder.Add(edgeCompound, it.Value());
-        }
         BRepLib_FindSurface planeFinder(edgeCompound, -1, Standard_True);
         if (!planeFinder.Found()) {
             FC_WARN("FaceMakerBuildFace: edges are not coplanar");
