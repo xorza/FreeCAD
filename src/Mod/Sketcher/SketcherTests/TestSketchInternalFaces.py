@@ -273,7 +273,7 @@ class TestSketchInternalFaces(unittest.TestCase):
     # ==================================================================
 
     def testTwoOverlappingCircles(self):
-        """Two overlapping circles: 3 faces (Venn diagram), no overlap between faces."""
+        """Two overlapping circles: 3 non-overlapping faces (Venn diagram)."""
         sk = self._make_sketch()
         r = 10
         d = 12
@@ -287,9 +287,10 @@ class TestSketchInternalFaces(unittest.TestCase):
         lens = 2 * r * r * math.acos(cos_arg) - (d / 2) * math.sqrt(4 * r * r - d * d)
         expected = 2 * math.pi * r * r - lens
         self.assertAlmostEqual(total_face_area(faces), expected, places=1)
+        self.assertFalse(faces_overlap(faces))
 
     def testTwoOverlappingRectangles(self):
-        """Two overlapping rectangles: 3 faces, total area = union."""
+        """Two overlapping rectangles: 3 non-overlapping faces, total area = union."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
         add_rectangle(sk, 5, 5, 15, 15)
@@ -297,15 +298,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         faces = get_internal_faces(sk)
         self.assertEqual(len(faces), 3)
         self.assertAlmostEqual(total_face_area(faces), 175.0, places=2)
-
-    def testTwoOverlappingRectanglesNoOverlap(self):
-        """Faces from two overlapping rectangles must not share interior area."""
-        sk = self._make_sketch()
-        add_rectangle(sk, 0, 0, 10, 10)
-        add_rectangle(sk, 5, 5, 15, 15)
-        self.Doc.recompute()
-        faces = get_internal_faces(sk)
-        self.assertFalse(faces_overlap(faces), "Generated faces must not overlap")
+        self.assertFalse(faces_overlap(faces))
 
     def testCircleOverlappingRectangle(self):
         """Circle partially overlapping rectangle produces correct face count."""
@@ -346,11 +339,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         """Rectangle with horizontal and vertical midpoint lines: 4 equal faces."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
-        # Horizontal midline
-        i = int(sk.GeometryCount)
         sk.addGeometry(Part.LineSegment(App.Vector(0, 5, 0), App.Vector(10, 5, 0)))
-        # Vertical midline
-        j = int(sk.GeometryCount)
         sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 10, 0)))
         self.Doc.recompute()
         faces = get_internal_faces(sk)
@@ -373,19 +362,51 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
 
     def testTJunction(self):
-        """A line from the boundary meeting a diagonal without crossing it
-        should not create artifact faces."""
+        """A line from the boundary to the diagonal midpoint creates a valid
+        T-junction subdivision: 3 faces (the lower triangle is split in two)."""
         sk = self._make_sketch()
         add_rectangle(sk, 0, 0, 10, 10)
         # Diagonal divides rectangle into 2 triangles
         sk.addGeometry(Part.LineSegment(App.Vector(0, 0, 0), App.Vector(10, 10, 0)))
-        # Dangling line from bottom edge to the diagonal midpoint
+        # Line from bottom edge to the diagonal midpoint — valid subdivision
         sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 5, 0)))
         self.Doc.recompute()
         faces = get_internal_faces(sk)
-        # Should be 2 faces (diagonal splits rectangle), not 3 (artifact from T-junction)
-        self.assertEqual(len(faces), 2)
+        # 3 faces: upper triangle + 2 sub-triangles from the lower half
+        self.assertEqual(len(faces), 3)
         self.assertAlmostEqual(total_face_area(faces), 100.0, places=3)
+
+    def testMultipleDanglingLines(self):
+        """Multiple dangling lines from different edges should all be pruned."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        # Dangling from bottom edge
+        sk.addGeometry(Part.LineSegment(App.Vector(3, 0, 0), App.Vector(3, 4, 0)))
+        # Dangling from right edge
+        sk.addGeometry(Part.LineSegment(App.Vector(10, 6, 0), App.Vector(6, 6, 0)))
+        # Dangling from top edge
+        sk.addGeometry(Part.LineSegment(App.Vector(7, 10, 0), App.Vector(7, 7, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
+    def testDanglingChain(self):
+        """A chain of connected dangling segments (polyline entering from the
+        boundary) should be fully pruned by iterative degree-1 removal."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        i = int(sk.GeometryCount)
+        # 3-segment polyline entering from bottom edge, zig-zagging inside
+        sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 4, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(5, 4, 0), App.Vector(7, 6, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(7, 6, 0), App.Vector(4, 8, 0)))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i, 2, i + 1, 1))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i + 1, 2, i + 2, 1))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
 
     def testFloatingLine(self):
         """A line entirely inside a rectangle, not touching any boundary,
@@ -399,7 +420,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
 
     def testCrossPattern(self):
-        """Two perpendicular overlapping rectangles (+ shape): 5 faces."""
+        """Two perpendicular overlapping rectangles (+ shape): 5 non-overlapping faces."""
         sk = self._make_sketch()
         add_rectangle(sk, -5, -15, 5, 15)  # vertical bar
         add_rectangle(sk, -15, -5, 15, 5)  # horizontal bar
@@ -409,6 +430,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertEqual(len(faces), 5)
         # Total area = union = 2*(10*30) - 10*10 = 500
         self.assertAlmostEqual(total_face_area(faces), 500.0, places=2)
+        self.assertFalse(faces_overlap(faces))
 
     # ==================================================================
     # 9. Three overlapping shapes — the bug (issue #23406)
@@ -449,8 +471,6 @@ class TestSketchInternalFaces(unittest.TestCase):
         add_circle(sk, 4, 7, r)
         self.Doc.recompute()
         faces = get_internal_faces(sk)
-        if len(faces) == 0:
-            self.skipTest("Bug #23406: 3-circle face generation currently produces 0 faces")
         total = total_face_area(faces)
         # Compute union area via inclusion-exclusion (approximate: use shape boolean)
         c1 = Part.Face(Part.Wire(Part.makeCircle(r, App.Vector(0, 0, 0))))
@@ -485,29 +505,7 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertGreaterEqual(len(faces), 9, "Four overlapping circles should produce >= 9 faces")
 
     # ==================================================================
-    # 10. Faces must not overlap (geometric correctness)
-    # ==================================================================
-
-    def testTwoCirclesNoOverlap(self):
-        """Faces from two overlapping circles must not share interior area."""
-        sk = self._make_sketch()
-        add_circle(sk, 0, 0, 10)
-        add_circle(sk, 12, 0, 10)
-        self.Doc.recompute()
-        faces = get_internal_faces(sk)
-        self.assertFalse(faces_overlap(faces), "Faces must be non-overlapping")
-
-    def testCrossPatternNoOverlap(self):
-        """Faces from cross pattern must not share interior area."""
-        sk = self._make_sketch()
-        add_rectangle(sk, -5, -15, 5, 15)
-        add_rectangle(sk, -15, -5, 15, 5)
-        self.Doc.recompute()
-        faces = get_internal_faces(sk)
-        self.assertFalse(faces_overlap(faces), "Faces must be non-overlapping")
-
-    # ==================================================================
-    # 11. Element naming
+    # 10. Element naming
     # ==================================================================
 
     def testInternalShapeHasEdgeNames(self):
