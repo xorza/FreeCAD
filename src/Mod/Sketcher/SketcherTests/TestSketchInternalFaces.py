@@ -331,6 +331,73 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_face_area(faces), 100.0, places=3)
 
+    def testRectangleWithBothDiagonals(self):
+        """Rectangle with both diagonals should produce 4 triangular faces."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        sk.addGeometry(Part.LineSegment(App.Vector(0, 0, 0), App.Vector(10, 10, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(10, 0, 0), App.Vector(0, 10, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 4)
+        self.assertAlmostEqual(total_face_area(faces), 100.0, places=3)
+
+    def testRectangleWithMidpointCross(self):
+        """Rectangle with horizontal and vertical midpoint lines: 4 equal faces."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        # Horizontal midline
+        i = int(sk.GeometryCount)
+        sk.addGeometry(Part.LineSegment(App.Vector(0, 5, 0), App.Vector(10, 5, 0)))
+        # Vertical midline
+        j = int(sk.GeometryCount)
+        sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 10, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 4)
+        self.assertAlmostEqual(total_face_area(faces), 100.0, places=3)
+        for f in faces:
+            self.assertAlmostEqual(f.Area, 25.0, places=2)
+
+    def testIncompleteIntersection(self):
+        """A line from one edge that stops inside the rectangle must not create
+        artifact faces — the dangling line should be ignored."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        # Line from bottom edge going up but stopping at y=5 (doesn't reach top)
+        sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 5, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        # Should still be 1 face (the rectangle), dangling line ignored
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
+    def testTJunction(self):
+        """A line from the boundary meeting a diagonal without crossing it
+        should not create artifact faces."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        # Diagonal divides rectangle into 2 triangles
+        sk.addGeometry(Part.LineSegment(App.Vector(0, 0, 0), App.Vector(10, 10, 0)))
+        # Dangling line from bottom edge to the diagonal midpoint
+        sk.addGeometry(Part.LineSegment(App.Vector(5, 0, 0), App.Vector(5, 5, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        # Should be 2 faces (diagonal splits rectangle), not 3 (artifact from T-junction)
+        self.assertEqual(len(faces), 2)
+        self.assertAlmostEqual(total_face_area(faces), 100.0, places=3)
+
+    def testFloatingLine(self):
+        """A line entirely inside a rectangle, not touching any boundary,
+        should not create artifact faces."""
+        sk = self._make_sketch()
+        add_rectangle(sk, 0, 0, 10, 10)
+        sk.addGeometry(Part.LineSegment(App.Vector(3, 3, 0), App.Vector(7, 7, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
     def testCrossPattern(self):
         """Two perpendicular overlapping rectangles (+ shape): 5 faces."""
         sk = self._make_sketch()
