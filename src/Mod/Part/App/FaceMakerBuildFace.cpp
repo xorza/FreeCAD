@@ -27,7 +27,6 @@
 #include <Bnd_Box.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BRep_Builder.hxx>
-#include <BRep_Tool.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -37,7 +36,6 @@
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
-#include <TopTools_MapOfShape.hxx>
 #include <TopoDS.hxx>
 
 #include <Base/Console.h>
@@ -99,51 +97,45 @@ void Part::FaceMakerBuildFace::Build_Essence()
 
     // Step 2b: Remove dangling edges — edges with a vertex of degree 1.
     // These come from open wires that don't fully cross a region (incomplete
-    // intersections) and would create artifact faces in BuilderFace.
-    // Prune iteratively until no degree-1 vertices remain.
+    // intersections) and would create artifact faces at T-junctions in
+    // BuilderFace. Prune iteratively until no degree-1 vertices remain.
+    // Note: BOPAlgo_BuilderFace::PerformShapesToAvoid handles simple dangling
+    // endpoints (paired same-edge opposite orientation) but not T-junctions.
     {
+        BRep_Builder bb;
         bool changed = true;
         while (changed) {
             changed = false;
-            // Build vertex-to-edge map
+            TopoDS_Compound compound;
+            bb.MakeCompound(compound);
+            for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+                bb.Add(compound, it.Value());
+            }
             TopTools_IndexedDataMapOfShapeListOfShape vertexEdgeMap;
+            TopExp::MapShapesAndAncestors(compound, TopAbs_VERTEX, TopAbs_EDGE, vertexEdgeMap);
+
+            TopTools_ListOfShape filtered;
             for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
                 const TopoDS_Edge& e = TopoDS::Edge(it.Value());
                 TopoDS_Vertex v1, v2;
                 TopExp::Vertices(e, v1, v2);
-                if (!v1.IsNull()) {
-                    vertexEdgeMap.ChangeFromIndex(
-                        vertexEdgeMap.Contains(v1) ? vertexEdgeMap.FindIndex(v1)
-                                                   : vertexEdgeMap.Add(v1, {}))
-                        .Append(e);
+                bool dangling = false;
+                if (!v1.IsNull() && vertexEdgeMap.Contains(v1)
+                    && vertexEdgeMap.FindFromKey(v1).Size() == 1) {
+                    dangling = true;
                 }
-                if (!v2.IsNull()) {
-                    // For closed edges (v1 == v2), count the vertex twice
-                    vertexEdgeMap.ChangeFromIndex(
-                        vertexEdgeMap.Contains(v2) ? vertexEdgeMap.FindIndex(v2)
-                                                   : vertexEdgeMap.Add(v2, {}))
-                        .Append(e);
+                if (!v2.IsNull() && !v1.IsSame(v2) && vertexEdgeMap.Contains(v2)
+                    && vertexEdgeMap.FindFromKey(v2).Size() == 1) {
+                    dangling = true;
                 }
-            }
-            // Collect edges that have a degree-1 vertex
-            TopTools_MapOfShape toRemove;
-            for (int i = 1; i <= vertexEdgeMap.Extent(); ++i) {
-                if (vertexEdgeMap.FindFromIndex(i).Size() == 1) {
-                    const TopoDS_Edge& e =
-                        TopoDS::Edge(vertexEdgeMap.FindFromIndex(i).First());
-                    toRemove.Add(e);
+                if (!dangling) {
+                    filtered.Append(e);
+                }
+                else {
                     changed = true;
                 }
             }
-            if (changed) {
-                TopTools_ListOfShape filtered;
-                for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-                    if (!toRemove.Contains(it.Value())) {
-                        filtered.Append(it.Value());
-                    }
-                }
-                splitEdges = filtered;
-            }
+            splitEdges = filtered;
         }
         if (splitEdges.IsEmpty()) {
             return;
