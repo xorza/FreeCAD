@@ -27,13 +27,17 @@
 #include <Bnd_Box.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <GeomAdaptor_Surface.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_MapOfShape.hxx>
 #include <TopoDS.hxx>
 
 #include <Base/Console.h>
@@ -91,6 +95,59 @@ void Part::FaceMakerBuildFace::Build_Essence()
     }
     else {
         splitEdges = edgeList;
+    }
+
+    // Step 2b: Remove dangling edges — edges with a vertex of degree 1.
+    // These come from open wires that don't fully cross a region (incomplete
+    // intersections) and would create artifact faces in BuilderFace.
+    // Prune iteratively until no degree-1 vertices remain.
+    {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            // Build vertex-to-edge map
+            TopTools_IndexedDataMapOfShapeListOfShape vertexEdgeMap;
+            for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+                const TopoDS_Edge& e = TopoDS::Edge(it.Value());
+                TopoDS_Vertex v1, v2;
+                TopExp::Vertices(e, v1, v2);
+                if (!v1.IsNull()) {
+                    vertexEdgeMap.ChangeFromIndex(
+                        vertexEdgeMap.Contains(v1) ? vertexEdgeMap.FindIndex(v1)
+                                                   : vertexEdgeMap.Add(v1, {}))
+                        .Append(e);
+                }
+                if (!v2.IsNull()) {
+                    // For closed edges (v1 == v2), count the vertex twice
+                    vertexEdgeMap.ChangeFromIndex(
+                        vertexEdgeMap.Contains(v2) ? vertexEdgeMap.FindIndex(v2)
+                                                   : vertexEdgeMap.Add(v2, {}))
+                        .Append(e);
+                }
+            }
+            // Collect edges that have a degree-1 vertex
+            TopTools_MapOfShape toRemove;
+            for (int i = 1; i <= vertexEdgeMap.Extent(); ++i) {
+                if (vertexEdgeMap.FindFromIndex(i).Size() == 1) {
+                    const TopoDS_Edge& e =
+                        TopoDS::Edge(vertexEdgeMap.FindFromIndex(i).First());
+                    toRemove.Add(e);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                TopTools_ListOfShape filtered;
+                for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+                    if (!toRemove.Contains(it.Value())) {
+                        filtered.Append(it.Value());
+                    }
+                }
+                splitEdges = filtered;
+            }
+        }
+        if (splitEdges.IsEmpty()) {
+            return;
+        }
     }
 
     // Step 3: Determine the plane
