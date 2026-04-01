@@ -28,8 +28,7 @@
 #include <BOPAlgo_Tools.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BRep_Builder.hxx>
-#include <BRep_Tool.hxx>
-#include <BRepAlgoAPI_BuilderAlgo.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -59,12 +58,6 @@ std::string FaceMakerFishEye::getBriefExplanation() const
 {
     return {tr("Unified: handles nested holes, overlapping wires, and curved surfaces")
                 .toStdString()};
-}
-
-void FaceMakerFishEye::setPlane(const gp_Pln& plane)
-{
-    myPlane = plane;
-    planeSupplied = true;
 }
 
 namespace
@@ -140,8 +133,10 @@ void unite(std::vector<int>& parent, int a, int b)
 
 std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& inputWires)
 {
+    int n = static_cast<int>(inputWires.size());
+
     std::vector<WireFace> wfs;
-    wfs.reserve(inputWires.size());
+    wfs.reserve(n);
     for (const auto& w : inputWires) {
         WireFace wf;
         wf.wire = w;
@@ -153,22 +148,22 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
         wfs.push_back(std::move(wf));
     }
 
-    std::vector<int> parent(wfs.size());
-    for (size_t i = 0; i < parent.size(); ++i) {
-        parent[i] = static_cast<int>(i);
+    std::vector<int> parent(n);
+    for (int i = 0; i < n; ++i) {
+        parent[i] = i;
     }
 
     bool hasOverlaps = false;
-    for (size_t i = 0; i < wfs.size(); ++i) {
+    for (int i = 0; i < n; ++i) {
         if (!wfs[i].isValid()) {
             continue;
         }
-        for (size_t j = i + 1; j < wfs.size(); ++j) {
+        for (int j = i + 1; j < n; ++j) {
             if (!wfs[j].isValid()) {
                 continue;
             }
             if (hasPartialOverlap(wfs[i], wfs[j])) {
-                unite(parent, static_cast<int>(i), static_cast<int>(j));
+                unite(parent, i, j);
                 hasOverlaps = true;
             }
         }
@@ -178,9 +173,9 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
         return inputWires;
     }
 
-    std::map<int, std::vector<size_t>> groups;
-    for (size_t i = 0; i < wfs.size(); ++i) {
-        groups[findRoot(parent, static_cast<int>(i))].push_back(i);
+    std::map<int, std::vector<int>> groups;
+    for (int i = 0; i < n; ++i) {
+        groups[findRoot(parent, i)].push_back(i);
     }
 
     std::vector<TopoDS_Wire> result;
@@ -190,30 +185,32 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
             continue;
         }
 
-        TopTools_ListOfShape toFuse;
-        for (size_t idx : indices) {
-            if (wfs[idx].isValid()) {
-                toFuse.Append(wfs[idx].face);
+        // Iterative pairwise fuse to get a true union
+        TopoDS_Shape fused;
+        bool fusedValid = false;
+        for (int idx : indices) {
+            if (!wfs[idx].isValid()) {
+                continue;
+            }
+            if (!fusedValid) {
+                fused = wfs[idx].face;
+                fusedValid = true;
+                continue;
+            }
+            BRepAlgoAPI_Fuse fuseOp(fused, wfs[idx].face);
+            if (fuseOp.IsDone() && !fuseOp.Shape().IsNull()) {
+                fused = fuseOp.Shape();
             }
         }
-        if (toFuse.Size() < 2) {
-            for (size_t idx : indices) {
+
+        if (!fusedValid) {
+            for (int idx : indices) {
                 result.push_back(wfs[idx].wire);
             }
             continue;
         }
 
-        BRepAlgoAPI_BuilderAlgo fuser;
-        fuser.SetArguments(toFuse);
-        fuser.Build();
-        if (!fuser.IsDone()) {
-            for (size_t idx : indices) {
-                result.push_back(wfs[idx].wire);
-            }
-            continue;
-        }
-
-        for (TopExp_Explorer fExp(fuser.Shape(), TopAbs_FACE); fExp.More(); fExp.Next()) {
+        for (TopExp_Explorer fExp(fused, TopAbs_FACE); fExp.More(); fExp.Next()) {
             TopoDS_Wire outerWire = BRepTools::OuterWire(TopoDS::Face(fExp.Current()));
             if (!outerWire.IsNull()) {
                 result.push_back(outerWire);
@@ -276,6 +273,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         gp_Pnt interiorPt;
         gp_Pnt2d interiorPt2d;
         if (BOPTools_AlgoTools3D::PointInFace(face, interiorPt, interiorPt2d, ctx) != 0) {
+            FC_WARN("PointInFace failed, keeping face without classification");
             result.push_back(face);
             continue;
         }
@@ -321,6 +319,15 @@ void FaceMakerFishEye::Build_Essence()
 {
     if (myWires.empty()) {
         return;
+    }
+
+    // Fast path: single wire needs no overlap detection or even-odd classification
+    if (myWires.size() == 1) {
+        TopoDS_Face face = makeFaceFromWire(myWires.front());
+        if (!face.IsNull()) {
+            myShapesToReturn.push_back(face);
+            return;
+        }
     }
 
     // Phase 1: Fuse overlapping wires (union semantics for crossing wires)
