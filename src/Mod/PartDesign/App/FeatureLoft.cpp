@@ -250,6 +250,7 @@ App::DocumentObjectExecReturn* Loft::execute()
                 backwires.push_back(sectionWires.back());
             }
             const char* faceMaker[] = {
+                "Part::FaceMakerFishEye",
                 "Part::FaceMakerBullseye",
                 "Part::FaceMakerCheese",
                 "Part::FaceMakerSimple",

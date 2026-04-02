@@ -26,6 +26,8 @@
 
 #include "FaceMaker.h"
 
+#include <gp_Pln.hxx>
+
 #include <Mod/Part/PartGlobal.h>
 
 namespace Part
@@ -49,11 +51,17 @@ class PartExport FaceMakerFishEye: public FaceMakerPublic
     TYPESYSTEM_HEADER_WITH_OVERRIDE();
 
 public:
+    void setPlane(const gp_Pln& plane) override;
+
     std::string getUserFriendlyName() const override;
     std::string getBriefExplanation() const override;
 
 protected:
     void Build_Essence() override;
+
+private:
+    gp_Pln myPlane;
+    bool planeSupplied {false};
 };
 
 }  // namespace Part

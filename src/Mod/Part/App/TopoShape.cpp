@@ -4272,7 +4272,7 @@ TopoShape& TopoShape::makeFace(const std::vector<TopoShape>& shapes, const char*
     _Shape.Nullify();
 
     if (!maker || !maker[0]) {
-        maker = "Part::FaceMakerBullseye";
+        maker = "Part::FaceMakerFishEye";
     }
 
     std::unique_ptr<FaceMaker> mkFace = FaceMaker::ConstructFromType(maker);

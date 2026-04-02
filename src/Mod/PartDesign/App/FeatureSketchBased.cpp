@@ -308,7 +308,7 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                     }
                     if (!shape.isNull()) {
                         if (AllowMultiFace.getValue()) {
-                            shape = shape.makeElementFace();  // default to use FaceMakerBullseye
+                            shape = shape.makeElementFace();
                         }
                         else {
                             shape = shape.makeElementFace(nullptr, "Part::FaceMakerCheese");
@@ -391,7 +391,7 @@ TopoDS_Shape ProfileBased::getVerifiedFace(bool silent) const
                         shape = shape.makeWires();
                     }
                     if (shape.hasSubShape(TopAbs_WIRE)) {
-                        shape = shape.makeFace(nullptr, "Part::FaceMakerBullseye");
+                        shape = shape.makeFace(nullptr, "Part::FaceMakerFishEye");
                     }
                     else {
                         err = "Cannot make face from profile";

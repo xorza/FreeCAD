@@ -37,9 +37,11 @@
 #include <BRepGProp.hxx>
 #include <BRepTools.hxx>
 #include <Bnd_Box.hxx>
+#include <BRepLib_FindSurface.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
-#include <Geom_Circle.hxx>
+#include <GeomAdaptor_Surface.hxx>
+#include <Geom_Conic.hxx>
 #include <Geom_Line.hxx>
 #include <GeomAbs_Shape.hxx>
 #include <GeomAPI.hxx>
@@ -58,6 +60,12 @@ FC_LOG_LEVEL_INIT("FaceMakerFishEye", true, true)
 using namespace Part;
 
 TYPESYSTEM_SOURCE(Part::FaceMakerFishEye, Part::FaceMakerPublic)
+
+void FaceMakerFishEye::setPlane(const gp_Pln& plane)
+{
+    myPlane = plane;
+    planeSupplied = true;
+}
 
 std::string FaceMakerFishEye::getUserFriendlyName() const
 {
@@ -335,6 +343,24 @@ TopoDS_Face fillNonPlanarWire(const TopoDS_Wire& wire)
 }
 
 
+// ─── Plane detection ────────────────────────────────────────────────────────
+
+bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
+{
+    BRep_Builder builder;
+    TopoDS_Compound comp;
+    builder.MakeCompound(comp);
+    for (const auto& w : wires) {
+        builder.Add(comp, w);
+    }
+    BRepLib_FindSurface planeFinder(comp, -1, /*OnlyPlane=*/Standard_True);
+    if (!planeFinder.Found()) {
+        return false;
+    }
+    plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
+    return true;
+}
+
 // ─── Pre-processing: split self-intersecting edges ─────────────────────────
 //
 // A single BSpline that crosses itself (e.g. figure-8) needs to be split
@@ -343,12 +369,12 @@ TopoDS_Face fillNonPlanarWire(const TopoDS_Wire& wire)
 // splits into sub-edges, then reassembles into multiple wires via
 // BOPAlgo_Tools::EdgesToWires.
 
-std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wire>& inputWires)
+std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wire>& inputWires,
+                                                    const gp_Pln& plane)
 {
     const Standard_Real tol = Precision::Confusion();
     bool anySplit = false;
 
-    // Collect all edges, splitting self-intersecting ones
     TopTools_ListOfShape allEdges;
     for (const auto& wire : inputWires) {
         for (TopExp_Explorer exp(wire, TopAbs_EDGE); exp.More(); exp.Next()) {
@@ -362,52 +388,15 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     continue;
                 }
 
-                // Lines, circles, and arcs never self-intersect — skip the
-                // expensive plane detection and 2D projection.
+                // Lines and conics never self-intersect
                 if (curve3d->IsKind(STANDARD_TYPE(Geom_Line))
-                    || curve3d->IsKind(STANDARD_TYPE(Geom_Circle))) {
+                    || curve3d->IsKind(STANDARD_TYPE(Geom_Conic))) {
                     allEdges.Append(edge);
                     continue;
                 }
 
-                // Detect the curve's plane by sampling 3 points and computing
-                // the normal. Skip non-planar curves where 2D projection would
-                // create false self-intersections.
-                const double planeTol = 1e-4;
-                gp_Pnt p0 = curve3d->Value(first);
-                gp_Pnt p1 = curve3d->Value(first + (last - first) * 0.33);
-                gp_Pnt p2 = curve3d->Value(first + (last - first) * 0.67);
-
-                gp_Vec v1(p0, p1);
-                gp_Vec v2(p0, p2);
-                gp_Vec normal = v1.Crossed(v2);
-                if (normal.Magnitude() < tol) {
-                    // Degenerate or collinear — cannot form a plane
-                    allEdges.Append(edge);
-                    continue;
-                }
-
-                gp_Pln curvePlane(p0, gp_Dir(normal));
-
-                // Verify all sampled points lie on the detected plane
-                {
-                    bool isPlanar = true;
-                    const int nSamples = 10;
-                    for (int s = 0; s <= nSamples; s++) {
-                        double t = first + (last - first) * s / nSamples;
-                        if (curvePlane.Distance(curve3d->Value(t)) > planeTol) {
-                            isPlanar = false;
-                            break;
-                        }
-                    }
-                    if (!isPlanar) {
-                        allEdges.Append(edge);
-                        continue;
-                    }
-                }
-
-                // Project onto the detected plane for 2D self-intersection test
-                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, curvePlane);
+                // Project onto the supplied plane for 2D self-intersection test
+                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, plane);
                 if (curve2d.IsNull()) {
                     allEdges.Append(edge);
                     continue;
@@ -506,8 +495,21 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
+    // Detect the plane from geometry (or use the externally supplied one)
+    gp_Pln plane;
+    bool havePlane = planeSupplied;
+    if (havePlane) {
+        plane = myPlane;
+    }
+    else {
+        havePlane = findPlane(myWires, plane);
+    }
+
     // Pre-process: split self-intersecting edges into separate wires
-    std::vector<TopoDS_Wire> wires = splitSelfIntersectingWires(myWires);
+    std::vector<TopoDS_Wire> wires = myWires;
+    if (havePlane) {
+        wires = splitSelfIntersectingWires(myWires, plane);
+    }
 
     // Fast path: single wire needs no overlap detection or even-odd classification
     if (wires.size() == 1) {

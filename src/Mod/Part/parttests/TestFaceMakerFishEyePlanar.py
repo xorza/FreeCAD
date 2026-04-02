@@ -351,6 +351,19 @@ class _Degenerate(_PlaneTestBase):
         faces = self.fisheye(w)
         self.assertGreaterEqual(len(faces), 1)
 
+    def test_figure_8_bspline(self):
+        """Single self-intersecting BSpline forming a figure-8 -> 2 faces."""
+        poles = [
+            Vec(0, 26.06), Vec(14.6, 15.54), Vec(0.51, 0),
+            Vec(-16.13, -17.23), Vec(0, -24.02), Vec(17.15, -9.42),
+            Vec(-16.64, 15.20), Vec(0, 26.06),
+        ]
+        bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
+        w = Part.Wire([bs.toShape()])
+        faces = self.fisheye(w)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(total_area(faces), 0)
+
 
 # =========================================================================
 # Standalone tests (plane-independent, run once)

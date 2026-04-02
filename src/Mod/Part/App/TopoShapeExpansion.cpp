@@ -4808,7 +4808,7 @@ TopoShape& TopoShape::makeElementFace(
 )
 {
     if (!maker || !maker[0]) {
-        maker = "Part::FaceMakerBullseye";
+        maker = "Part::FaceMakerFishEye";
     }
     std::unique_ptr<FaceMaker> mkFace = FaceMaker::ConstructFromType(maker);
     mkFace->MyHasher = Hasher;
