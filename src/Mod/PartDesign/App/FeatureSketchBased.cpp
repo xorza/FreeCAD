@@ -307,12 +307,7 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                         }
                     }
                     if (!shape.isNull()) {
-                        if (AllowMultiFace.getValue()) {
-                            shape = shape.makeElementFace();
-                        }
-                        else {
-                            shape = shape.makeElementFace(nullptr, "Part::FaceMakerCheese");
-                        }
+                        shape = shape.makeElementFace();
                     }
                 }
             }
