@@ -352,6 +352,20 @@ class _Degenerate(_PlaneTestBase):
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 100.0, places=1)
 
+    def test_bspline_with_separate_line(self):
+        """Self-intersecting BSpline + separate non-touching line:
+        BSpline should produce 2 lobes, line should be pruned."""
+        poles = [
+            Vec(0, 26.06), Vec(14.6, 15.54), Vec(0.51, 0),
+            Vec(-16.13, -17.23), Vec(0, -24.02), Vec(17.15, -9.42),
+            Vec(-16.64, 15.20), Vec(0, 26.06),
+        ]
+        bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
+        separate_line = line_wire((500, 500), (600, 600))
+        faces = self.fisheye([Part.Wire([bs.toShape()]), separate_line])
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(total_area(faces), 0)
+
     def test_bspline_with_overlapping_circles(self):
         """Self-intersecting BSpline must not affect separate overlapping
         circles. The circles should still produce the correct Venn regions."""

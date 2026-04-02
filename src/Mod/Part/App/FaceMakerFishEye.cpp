@@ -159,7 +159,12 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
     for (const auto& w : inputWires) {
         WireFace wf;
         wf.wire = w;
-        wf.face = makeFaceFromWire(w);
+        // Only make faces from closed wires — open wires (dangling lines)
+        // can produce fake faces via BRepBuilderAPI_MakeFace that corrupt
+        // overlap detection.
+        if (BRep_Tool::IsClosed(w)) {
+            wf.face = makeFaceFromWire(w);
+        }
         if (wf.isValid()) {
             BRepBndLib::AddOptimal(w, wf.box, Standard_False);
             wf.area = shapeArea(wf.face);
@@ -320,11 +325,15 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     // Even-odd nesting: keep faces whose interior point is inside an
     // odd number of input wires. Uses IntTools_Context for cached
     // 2D point-in-polygon classification.
+    // Even-odd nesting: keep faces whose interior point is inside an
+    // odd number of input wires. Faces not inside ANY wire are kept
+    // unconditionally — they come from geometry that can't form reference
+    // faces (self-intersecting BSplines, etc.).
     Handle(IntTools_Context) ctx = new IntTools_Context();
     std::vector<TopoDS_Face> wireFaces;
     wireFaces.reserve(wires.size());
     for (const auto& w : wires) {
-        wireFaces.push_back(makeFaceFromWire(w));
+        wireFaces.push_back(BRep_Tool::IsClosed(w) ? makeFaceFromWire(w) : TopoDS_Face());
     }
 
     for (const auto& face : allFaces) {
@@ -346,7 +355,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
             }
         }
 
-        if (containCount % 2 == 1) {
+        if (containCount == 0 || containCount % 2 == 1) {
             result.push_back(face);
         }
     }
