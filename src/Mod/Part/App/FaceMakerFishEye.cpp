@@ -276,10 +276,42 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         return false;
     }
 
-    // Collect all face regions
+    // Collect all face regions, stripping internal wires left by
+    // BOPAlgo_BuilderFace::PerformInternalShapes (dangling edge remnants
+    // that would create degenerate geometry when extruded).
     std::vector<TopoDS_Face> allFaces;
     for (TopExp_Explorer exp(faceShape, TopAbs_FACE); exp.More(); exp.Next()) {
-        allFaces.push_back(TopoDS::Face(exp.Current()));
+        TopoDS_Face face = TopoDS::Face(exp.Current());
+        bool hasInternal = false;
+        for (TopExp_Explorer eExp(face, TopAbs_EDGE); eExp.More(); eExp.Next()) {
+            if (eExp.Current().Orientation() == TopAbs_INTERNAL) {
+                hasInternal = true;
+                break;
+            }
+        }
+        if (hasInternal) {
+            // Rebuild face without wires that contain internal edges
+            BRep_Builder fb;
+            TopoDS_Face cleaned;
+            fb.MakeFace(cleaned, BRep_Tool::Surface(face), BRep_Tool::Tolerance(face));
+            for (TopExp_Explorer wExp(face, TopAbs_WIRE); wExp.More(); wExp.Next()) {
+                bool allInternal = true;
+                for (TopExp_Explorer eExp(wExp.Current(), TopAbs_EDGE); eExp.More();
+                     eExp.Next()) {
+                    if (eExp.Current().Orientation() != TopAbs_INTERNAL) {
+                        allInternal = false;
+                        break;
+                    }
+                }
+                if (!allInternal) {
+                    fb.Add(cleaned, wExp.Current());
+                }
+            }
+            allFaces.push_back(cleaned);
+        }
+        else {
+            allFaces.push_back(face);
+        }
     }
     if (allFaces.empty()) {
         return false;

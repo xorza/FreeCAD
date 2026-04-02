@@ -258,6 +258,26 @@ class _Subdivision(_PlaneTestBase):
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 100.0, places=3)
 
+    def test_circle_with_dangling_radius(self):
+        """Circle + line from center to outside: dangling line should be
+        pruned, producing 1 circular face with a single wire."""
+        r = 10
+        faces = self.fisheye([circle_wire(0, 0, r), line_wire((0, 0), (r + 5, 0))])
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, math.pi * r * r, places=1)
+        # Face should have 1 clean wire — no internal dangling edges
+        self.assertEqual(len(faces[0].Wires), 1)
+
+    def test_circle_with_line_through(self):
+        """Circle + line from outside through interior to outside: the line
+        crosses the boundary twice, creating a chord that splits the circle
+        into 2 faces. No dangling segments should remain."""
+        r = 10
+        faces = self.fisheye([circle_wire(0, 0, r), line_wire((-r - 5, 0), (r + 5, 0))])
+        self.assertEqual(len(faces), 2)
+        self.assertAlmostEqual(total_area(faces), math.pi * r * r, places=1)
+
+
 
 class _MultipleOverlapping(_PlaneTestBase):
     def test_three_circles(self):
