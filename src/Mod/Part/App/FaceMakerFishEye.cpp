@@ -558,16 +558,12 @@ void FaceMakerFishEye::Build_Essence()
     else {
         // Non-planar: try MakeFace (analytical surfaces like cylinders),
         // then BRepFill_Filling (freeform BSpline patch).
-        // Skip open wires — they can't form meaningful faces.
         for (const auto& w : wires) {
-            if (!BRep_Tool::IsClosed(w)) {
-                continue;
-            }
             TopoDS_Face face = makeFaceFromWire(w);
-            if (face.IsNull()) {
+            if (face.IsNull() && BRep_Tool::IsClosed(w)) {
                 face = fillNonPlanar(w);
             }
-            if (!face.IsNull()) {
+            if (!face.IsNull() && shapeArea(face) > Precision::Confusion()) {
                 myShapesToReturn.push_back(face);
             }
         }
