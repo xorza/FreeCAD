@@ -311,13 +311,6 @@ class _OverlapWithHoles(_PlaneTestBase):
 
 
 class _Degenerate(_PlaneTestBase):
-    def test_single_open_line(self):
-        try:
-            faces = self.fisheye(line_wire((0, 0), (10, 0)))
-            self.assertEqual(len(faces), 0)
-        except RuntimeError:
-            pass
-
     def test_crossing_edges(self):
         w = Part.Wire(
             Part.makePolygon(
@@ -370,7 +363,17 @@ class _Degenerate(_PlaneTestBase):
 # =========================================================================
 
 
-class TestEmptyInput(unittest.TestCase):
+class TestDegenerateInput(unittest.TestCase):
+    def test_single_open_line(self):
+        try:
+            faces = Part.makeFace(
+                Part.Compound([line_wire((0, 0), (10, 0))]),
+                "Part::FaceMakerFishEye",
+            ).Faces
+            self.assertEqual(len(faces), 0)
+        except RuntimeError:
+            pass
+
     def test_empty_compound(self):
         try:
             shape = Part.makeFace(Part.Compound([]), "Part::FaceMakerFishEye")
@@ -397,7 +400,7 @@ _MIXINS = [
 _PLANES = {
     "XY": FreeCAD.Placement(),
     "XZ": FreeCAD.Placement(Vec(0, 0, 0), FreeCAD.Rotation(Vec(1, 0, 0), 90)),
-    "Tilted45": FreeCAD.Placement(Vec(0, 0, 0), FreeCAD.Rotation(Vec(1, 0, 0), 45)),
+    "Tilted": FreeCAD.Placement(Vec(10, -20, 15), FreeCAD.Rotation(Vec(1, 0, 0), 45) * FreeCAD.Rotation(Vec(0, 0, 1), 30)),
 }
 
 for _plane_name, _placement in _PLANES.items():
