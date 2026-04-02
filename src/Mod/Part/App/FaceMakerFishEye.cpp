@@ -120,7 +120,7 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
     // myTolReached < maxEdgeTol * 5). Check ToleranceReached()
     // to reject near-planar geometry that isn't truly flat.
     BRepLib_FindSurface planeFinder(comp, -1, /*OnlyPlane=*/Standard_True);
-    if (!planeFinder.Found() || planeFinder.ToleranceReached() > 1e-4) {
+    if (!planeFinder.Found() || planeFinder.ToleranceReached() > Precision::Approximation()) {
         return false;
     }
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
@@ -216,7 +216,14 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& i
                     wireEdges.Append(edge);
                 }
             }
+            catch (const Standard_Failure& e) {
+                if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
+                    FC_WARN("splitSelfIntersecting: " << e.GetMessageString());
+                }
+                wireEdges.Append(edge);
+            }
             catch (...) {
+                FC_WARN("splitSelfIntersecting: unknown exception");
                 wireEdges.Append(edge);
             }
         }
@@ -552,7 +559,7 @@ void FaceMakerFishEye::Build_Essence()
         // Non-planar: try MakeFace (analytical surfaces like cylinders),
         // then BRepFill_Filling (freeform BSpline patch).
         // Skip open wires — they can't form meaningful faces.
-        for (const auto& w : myWires) {
+        for (const auto& w : wires) {
             if (!BRep_Tool::IsClosed(w)) {
                 continue;
             }
