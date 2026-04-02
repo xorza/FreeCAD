@@ -28,7 +28,6 @@
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
-#include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
@@ -343,7 +342,7 @@ void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
 // at the crossing points before the main pipeline can process it.
 // Uses Geom2dAPI_InterCurveCurve to detect self-intersections in 2D,
 // splits into sub-edges, then reassembles into multiple wires via
-// BRepAlgoAPI_BuilderAlgo + BOPAlgo_Tools::EdgesToWires.
+// BOPAlgo_Tools::EdgesToWires.
 
 std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wire>& inputWires)
 {
@@ -364,28 +363,44 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     continue;
                 }
 
-                // Skip non-planar edges: XY projection creates false intersections
-                // for 3D curves that don't actually cross themselves.
+                // Detect the curve's plane by sampling 3 points and computing
+                // the normal. Skip non-planar curves where 2D projection would
+                // create false self-intersections.
+                const double planeTol = 1e-4;
+                gp_Pnt p0 = curve3d->Value(first);
+                gp_Pnt p1 = curve3d->Value(first + (last - first) * 0.33);
+                gp_Pnt p2 = curve3d->Value(first + (last - first) * 0.67);
+
+                gp_Vec v1(p0, p1);
+                gp_Vec v2(p0, p2);
+                gp_Vec normal = v1.Crossed(v2);
+                if (normal.Magnitude() < tol) {
+                    // Degenerate or collinear — cannot form a plane
+                    allEdges.Append(edge);
+                    continue;
+                }
+
+                gp_Pln curvePlane(p0, gp_Dir(normal));
+
+                // Verify all sampled points lie on the detected plane
                 {
-                    bool hasZVariation = false;
-                    double z0 = curve3d->Value(first).Z();
+                    bool isPlanar = true;
                     const int nSamples = 10;
-                    for (int s = 1; s <= nSamples; s++) {
+                    for (int s = 0; s <= nSamples; s++) {
                         double t = first + (last - first) * s / nSamples;
-                        if (std::abs(curve3d->Value(t).Z() - z0) > tol) {
-                            hasZVariation = true;
+                        if (curvePlane.Distance(curve3d->Value(t)) > planeTol) {
+                            isPlanar = false;
                             break;
                         }
                     }
-                    if (hasZVariation) {
+                    if (!isPlanar) {
                         allEdges.Append(edge);
                         continue;
                     }
                 }
 
-                // Project to XY plane for 2D self-intersection test.
-                gp_Pln xyPlane;
-                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, xyPlane);
+                // Project onto the detected plane for 2D self-intersection test
+                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, curvePlane);
                 if (curve2d.IsNull()) {
                     allEdges.Append(edge);
                     continue;
@@ -455,22 +470,8 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
         return inputWires;
     }
 
-    // Run BuilderAlgo to create shared vertices at crossing points,
-    // then EdgesToWires to reassemble into closed wires
-    if (allEdges.Size() > 1) {
-        BRepAlgoAPI_BuilderAlgo splitter;
-        splitter.SetArguments(allEdges);
-        splitter.SetRunParallel(true);
-        splitter.SetNonDestructive(Standard_True);
-        splitter.Build();
-        if (splitter.IsDone()) {
-            allEdges.Clear();
-            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-                allEdges.Append(exp.Current());
-            }
-        }
-    }
-
+    // EdgesToWires splits edges at mutual intersections (internal BOPAlgo_Builder)
+    // and assembles into closed wires
     BRep_Builder builder;
     TopoDS_Compound edgeCompound;
     builder.MakeCompound(edgeCompound);
