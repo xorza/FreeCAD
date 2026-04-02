@@ -121,7 +121,7 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
         builder.Add(comp, BRepBuilderAPI_Copy(w).Shape());
     }
     BRepLib_FindSurface planeFinder(comp, -1, /*OnlyPlane=*/Standard_True);
-    if (!planeFinder.Found() || planeFinder.ToleranceReached() > Precision::Approximation()) {
+    if (!planeFinder.Found()) {
         return false;
     }
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
@@ -432,8 +432,12 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
         splitEdges = edges;
     }
 
-    // Build base face and PCurves
-    const Standard_Real aMax = 1.0e8;
+    // Build base face larger than the geometry bounds
+    Bnd_Box geomBox;
+    for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+        BRepBndLib::Add(it.Value(), geomBox);
+    }
+    const Standard_Real aMax = std::max(1.0e8, 10.0 * std::sqrt(geomBox.SquareExtent()));
     TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
     baseFace.Orientation(TopAbs_FORWARD);
 
