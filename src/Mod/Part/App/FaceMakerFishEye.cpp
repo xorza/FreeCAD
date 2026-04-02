@@ -257,7 +257,7 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
 // face regions with hole nesting. Even-odd classification uses cached
 // IntTools_Context for fast 2D point-in-polygon tests.
 
-bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
+void buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                       std::vector<TopoDS_Shape>& result)
 {
     // Collect all edges into a compound
@@ -278,7 +278,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     // WiresToFaces: finds planes, builds pcurves, runs BOPAlgo_BuilderFace
     TopoDS_Shape faceShape;
     if (!BOPAlgo_Tools::WiresToFaces(wireShape, faceShape)) {
-        return false;
+        return;
     }
 
     // Collect all face regions, stripping internal wires left by
@@ -319,7 +319,7 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         }
     }
     if (allFaces.empty()) {
-        return false;
+        return;
     }
 
     // Even-odd nesting: keep faces whose interior point is inside an
@@ -360,7 +360,6 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
         }
     }
 
-    return !result.empty();
 }
 
 // ─── Non-planar fallback: BRepFill_Filling (N-sided patch) ──────────────────
@@ -574,16 +573,17 @@ void FaceMakerFishEye::Build_Essence()
     // Phase 1: Fuse overlapping wires (union semantics for crossing wires)
     wires = fuseOverlappingWires(wires);
 
-    // Phase 2: Planar face building with even-odd nesting
-    if (buildPlanarFaces(wires, myShapesToReturn)) {
-        return;
+    if (havePlane) {
+        // Phase 2: Planar face building with even-odd nesting
+        buildPlanarFaces(wires, myShapesToReturn);
     }
-
-    // Phase 3: Non-planar fallback — try BRepFill_Filling on each wire
-    for (const auto& w : wires) {
-        TopoDS_Face face = fillNonPlanarWire(w);
-        if (!face.IsNull()) {
-            myShapesToReturn.push_back(face);
+    else {
+        // Phase 3: Non-planar fallback — try BRepFill_Filling on each wire
+        for (const auto& w : wires) {
+            TopoDS_Face face = fillNonPlanarWire(w);
+            if (!face.IsNull()) {
+                myShapesToReturn.push_back(face);
+            }
         }
     }
 }
