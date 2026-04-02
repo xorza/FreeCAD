@@ -13,7 +13,6 @@ from . import TestLoft
 from . import TestMirrored
 from . import TestMultiTransform
 from . import TestPad
-from . import TestFaceMakerFishEye
 from . import TestPipe
 from . import TestPocket
 from . import TestPolarPattern

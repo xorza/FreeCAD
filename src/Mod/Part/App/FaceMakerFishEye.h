@@ -42,7 +42,7 @@ namespace Part
  * Algorithm:
  * 1. Detect partially overlapping wires, fuse each group
  * 2. Planar path: split edges at intersections, BOPAlgo_BuilderFace
- * 3. Non-planar fallback: delegates to FaceMakerCheese
+ * 3. Non-planar fallback: BRepFill_Filling (N-sided BSpline patch)
  */
 class PartExport FaceMakerFishEye: public FaceMakerPublic
 {

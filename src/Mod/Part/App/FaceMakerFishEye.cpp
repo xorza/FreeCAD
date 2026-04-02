@@ -23,7 +23,6 @@
  ***************************************************************************/
 
 #include "FaceMakerFishEye.h"
-#include "FaceMakerCheese.h"
 
 #include <BOPAlgo_Tools.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
@@ -32,9 +31,11 @@
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
 #include <BRepTools.hxx>
 #include <Bnd_Box.hxx>
+#include <GeomAbs_Shape.hxx>
 #include <GProp_GProps.hxx>
 #include <IntTools_Context.hxx>
 #include <Precision.hxx>
@@ -296,18 +297,34 @@ bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
     return !result.empty();
 }
 
-// ─── Non-planar fallback: delegate to FaceMakerCheese ────────────────────────
+// ─── Non-planar fallback: BRepFill_Filling (N-sided patch) ──────────────────
+
+TopoDS_Face fillNonPlanarWire(const TopoDS_Wire& wire)
+{
+    try {
+        BRepFill_Filling filler;
+        for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next()) {
+            filler.Add(TopoDS::Edge(ex.Current()), GeomAbs_C0);
+        }
+        filler.Build();
+        if (filler.IsDone()) {
+            return filler.Face();
+        }
+    }
+    catch (...) {
+        FC_WARN("BRepFill_Filling failed for non-planar wire");
+    }
+    return {};
+}
 
 void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                          std::vector<TopoDS_Shape>& result)
 {
-    FaceMakerCheese cheese;
     for (const auto& w : wires) {
-        cheese.addWire(w);
-    }
-    cheese.Build();
-    for (TopExp_Explorer exp(cheese.Shape(), TopAbs_FACE); exp.More(); exp.Next()) {
-        result.push_back(exp.Current());
+        TopoDS_Face face = fillNonPlanarWire(w);
+        if (!face.IsNull()) {
+            result.push_back(face);
+        }
     }
 }
 
@@ -324,6 +341,12 @@ void FaceMakerFishEye::Build_Essence()
     // Fast path: single wire needs no overlap detection or even-odd classification
     if (myWires.size() == 1) {
         TopoDS_Face face = makeFaceFromWire(myWires.front());
+        if (!face.IsNull()) {
+            myShapesToReturn.push_back(face);
+            return;
+        }
+        // Planar MakeFace failed — try non-planar filling
+        face = fillNonPlanarWire(myWires.front());
         if (!face.IsNull()) {
             myShapesToReturn.push_back(face);
             return;
