@@ -45,9 +45,7 @@
 #include <GProp_GProps.hxx>
 #include <IntTools_Context.hxx>
 #include <Precision.hxx>
-#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
-#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopoDS.hxx>
 
 #include <algorithm>
@@ -241,75 +239,18 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
 bool buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
                       std::vector<TopoDS_Shape>& result)
 {
-    // Collect all edges into a list
+    // Collect all edges into a compound
     BRep_Builder builder;
-    TopTools_ListOfShape edgeList;
+    TopoDS_Compound edgeCompound;
+    builder.MakeCompound(edgeCompound);
     for (const auto& w : wires) {
         for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
-            edgeList.Append(exp.Current());
+            builder.Add(edgeCompound, exp.Current());
         }
     }
 
-    // Split edges at intersections using BuilderAlgo
-    if (edgeList.Size() > 1) {
-        BRepAlgoAPI_BuilderAlgo splitter;
-        splitter.SetArguments(edgeList);
-        splitter.SetRunParallel(true);
-        splitter.SetNonDestructive(Standard_True);
-        splitter.Build();
-        if (splitter.IsDone()) {
-            edgeList.Clear();
-            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-                edgeList.Append(exp.Current());
-            }
-        }
-    }
-
-    // Remove dangling edges — edges where a vertex has degree 1.
-    // Open wires that don't fully cross a region (incomplete intersections)
-    // leave free endpoints that would create artifact faces in BuilderFace.
-    // Prune iteratively to handle chains of dangling segments.
-    TopoDS_Compound edgeCompound;
-    {
-        bool changed = true;
-        while (changed) {
-            changed = false;
-            builder.MakeCompound(edgeCompound);
-            for (TopTools_ListIteratorOfListOfShape it(edgeList); it.More(); it.Next()) {
-                builder.Add(edgeCompound, it.Value());
-            }
-            TopTools_IndexedDataMapOfShapeListOfShape vertexEdgeMap;
-            TopExp::MapShapesAndAncestors(edgeCompound, TopAbs_VERTEX, TopAbs_EDGE, vertexEdgeMap);
-
-            TopTools_ListOfShape filtered;
-            for (TopTools_ListIteratorOfListOfShape it(edgeList); it.More(); it.Next()) {
-                const TopoDS_Edge& e = TopoDS::Edge(it.Value());
-                TopoDS_Vertex v1, v2;
-                TopExp::Vertices(e, v1, v2);
-                bool dangling = false;
-                if (!v1.IsNull() && vertexEdgeMap.Contains(v1)
-                    && vertexEdgeMap.FindFromKey(v1).Size() == 1) {
-                    dangling = true;
-                }
-                if (!v2.IsNull() && !v1.IsSame(v2) && vertexEdgeMap.Contains(v2)
-                    && vertexEdgeMap.FindFromKey(v2).Size() == 1) {
-                    dangling = true;
-                }
-                if (!dangling) {
-                    filtered.Append(e);
-                }
-                else {
-                    changed = true;
-                }
-            }
-            edgeList = filtered;
-        }
-        if (edgeList.IsEmpty()) {
-            return false;
-        }
-    }
-
-    // EdgesToWires: assembles closed wires from split edges
+    // EdgesToWires: splits edges at intersections (internal BOPAlgo_Builder)
+    // and assembles into closed wires
     TopoDS_Shape wireShape;
     BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
 
