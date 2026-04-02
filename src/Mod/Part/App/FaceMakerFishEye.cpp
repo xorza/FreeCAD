@@ -405,42 +405,37 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                                                     const gp_Pln& plane)
 {
     const Standard_Real tol = Precision::Confusion();
-    bool anySplit = false;
+    std::vector<TopoDS_Wire> result;
+    TopTools_ListOfShape splitEdges;  // edges only from wires that had splits
 
-    TopTools_ListOfShape allEdges;
     for (const auto& wire : inputWires) {
+        bool wireSplit = false;
+        TopTools_ListOfShape wireEdges;
+
         for (TopExp_Explorer exp(wire, TopAbs_EDGE); exp.More(); exp.Next()) {
             const TopoDS_Edge& edge = TopoDS::Edge(exp.Current());
 
             try {
                 Standard_Real first, last;
                 Handle(Geom_Curve) curve3d = BRep_Tool::Curve(edge, first, last);
-                if (curve3d.IsNull()) {
-                    allEdges.Append(edge);
-                    continue;
-                }
-
-                // Lines and conics never self-intersect
-                if (curve3d->IsKind(STANDARD_TYPE(Geom_Line))
+                if (curve3d.IsNull() || curve3d->IsKind(STANDARD_TYPE(Geom_Line))
                     || curve3d->IsKind(STANDARD_TYPE(Geom_Conic))) {
-                    allEdges.Append(edge);
+                    wireEdges.Append(edge);
                     continue;
                 }
 
-                // Project onto the supplied plane for 2D self-intersection test
                 Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, plane);
                 if (curve2d.IsNull()) {
-                    allEdges.Append(edge);
+                    wireEdges.Append(edge);
                     continue;
                 }
 
                 Geom2dAPI_InterCurveCurve selfInt(curve2d, tol);
                 if (selfInt.NbPoints() == 0) {
-                    allEdges.Append(edge);
+                    wireEdges.Append(edge);
                     continue;
                 }
 
-                // Collect all parameter values at self-intersection points
                 std::vector<Standard_Real> params;
                 for (int i = 1; i <= selfInt.NbPoints(); i++) {
                     Geom2dAPI_ProjectPointOnCurve proj(selfInt.Point(i), curve2d, first, last);
@@ -452,7 +447,7 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     }
                 }
                 if (params.empty()) {
-                    allEdges.Append(edge);
+                    wireEdges.Append(edge);
                     continue;
                 }
 
@@ -468,7 +463,7 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     if (p - prev > tol) {
                         BRepBuilderAPI_MakeEdge me(curve3d, prev, p);
                         if (me.IsDone()) {
-                            allEdges.Append(me.Edge());
+                            wireEdges.Append(me.Edge());
                             didSplit = true;
                         }
                         prev = p;
@@ -477,44 +472,53 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                 if (last - prev > tol) {
                     BRepBuilderAPI_MakeEdge me(curve3d, prev, last);
                     if (me.IsDone()) {
-                        allEdges.Append(me.Edge());
+                        wireEdges.Append(me.Edge());
                         didSplit = true;
                     }
                 }
                 if (!didSplit) {
-                    allEdges.Append(edge);
+                    wireEdges.Append(edge);
                 }
                 else {
-                    anySplit = true;
+                    wireSplit = true;
                 }
             }
             catch (...) {
-                allEdges.Append(edge);
+                wireEdges.Append(edge);
             }
+        }
+
+        if (wireSplit) {
+            // Reassemble split edges into wires via EdgesToWires
+            for (TopTools_ListIteratorOfListOfShape it(wireEdges); it.More(); it.Next()) {
+                splitEdges.Append(it.Value());
+            }
+        }
+        else {
+            // Keep the original wire unchanged
+            result.push_back(wire);
         }
     }
 
-    if (!anySplit) {
+    if (splitEdges.IsEmpty()) {
         return inputWires;
     }
 
-    // EdgesToWires splits edges at mutual intersections (internal BOPAlgo_Builder)
-    // and assembles into closed wires
+    // Only reassemble wires that had self-intersecting edges
     BRep_Builder builder;
     TopoDS_Compound edgeCompound;
     builder.MakeCompound(edgeCompound);
-    for (TopTools_ListIteratorOfListOfShape it(allEdges); it.More(); it.Next()) {
+    for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
         builder.Add(edgeCompound, it.Value());
     }
 
     TopoDS_Shape wireShape;
     BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
 
-    std::vector<TopoDS_Wire> result;
     for (TopExp_Explorer exp(wireShape, TopAbs_WIRE); exp.More(); exp.Next()) {
         result.push_back(TopoDS::Wire(exp.Current()));
     }
-    return result.empty() ? inputWires : result;
+    return result;
 }
 
 }  // namespace

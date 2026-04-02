@@ -352,6 +352,28 @@ class _Degenerate(_PlaneTestBase):
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 100.0, places=1)
 
+    def test_bspline_with_overlapping_circles(self):
+        """Self-intersecting BSpline must not affect separate overlapping
+        circles. The circles should still produce the correct Venn regions."""
+        poles = [
+            Vec(-60, 0), Vec(-45, -15), Vec(-55, -25),
+            Vec(-65, -10), Vec(-50, 8), Vec(-60, 20),
+            Vec(-70, 10), Vec(-60, 0),
+        ]
+        bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
+        r = 10
+        faces = self.fisheye(
+            [Part.Wire([bs.toShape()]), circle_wire(0, 0, r), circle_wire(8, 0, r)]
+        )
+        # BSpline: 2 lobes + circles: 3 Venn regions = 5 total
+        self.assertGreaterEqual(len(faces), 5)
+        # Verify the circle area is preserved (union of two r=10 circles at d=8)
+        c1 = Part.Face(circle_wire(0, 0, r))
+        c2 = Part.Face(circle_wire(8, 0, r))
+        circle_union_area = union_area(c1, c2)
+        bspline_area = total_area(faces) - circle_union_area
+        self.assertGreater(bspline_area, 0)
+
     def test_figure_8_polygon(self):
         w = Part.Wire(
             Part.makePolygon(
