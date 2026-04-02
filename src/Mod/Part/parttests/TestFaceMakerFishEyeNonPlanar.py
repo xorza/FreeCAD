@@ -1,14 +1,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Non-XY-plane tests for Part::FaceMakerFishEye.
+"""Non-planar and multi-plane tests for Part::FaceMakerFishEye.
 
-These tests exercise cases that FaceMakerCheese handles via
-BRepBuilderAPI_MakeFace: wires on non-XY planes, wires on different
-planes, analytical surfaces, and nesting on arbitrary planes.
-
-FishEye must handle all cases Cheese handles, plus overlapping wires,
-self-intersecting BSplines, and edge splitting (tested separately in
-TestFaceMakerFishEyePlanar.py).
+Planar geometry on non-XY planes is already covered by
+TestFaceMakerFishEyePlanar.py (which transforms every test to XZ and
+tilted planes). This file tests cases that require different code paths:
+- Multiple wires on different planes (can't use single-plane transform)
+- Analytical surfaces (cylinder, cone)
+- Freeform non-planar surfaces (BRepFill_Filling)
 """
 
 import math
@@ -38,68 +37,11 @@ def total_area(faces):
 
 
 # =========================================================================
-# 1. Single shapes on non-XY planes
-# =========================================================================
-
-
-class TestSingleShapeNonXY(unittest.TestCase):
-    """Single closed wires on various planes. Both Cheese and FishEye
-    handle these via BRepBuilderAPI_MakeFace auto-detection."""
-
-    def test_rectangle_xz(self):
-        w = make_polygon((0, 0, 0), (10, 0, 0), (10, 0, 10), (0, 0, 10))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
-
-    def test_rectangle_yz(self):
-        w = make_polygon((0, 0, 0), (0, 10, 0), (0, 10, 10), (0, 0, 10))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
-
-    def test_rectangle_tilted(self):
-        s = 10 / math.sqrt(2)
-        w = make_polygon((0, 0, 0), (10, 0, 0), (10, s, s), (0, s, s))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, 100.0, places=1)
-
-    def test_triangle_arbitrary(self):
-        w = make_polygon((1, 2, 3), (11, 2, 3), (6, 10, 8))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertGreater(faces[0].Area, 0)
-
-    def test_circle_xz(self):
-        w = Part.Wire(Part.makeCircle(10, Vec(0, 0, 0), Vec(0, 1, 0)))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, math.pi * 100, places=1)
-
-    def test_circle_tilted(self):
-        w = Part.Wire(Part.makeCircle(10, Vec(0, 0, 0), Vec(1, 1, 1)))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, math.pi * 100, places=1)
-
-    def test_ellipse(self):
-        ell = Part.Ellipse(Vec(0, 0, 0), 15, 8)
-        w = Part.Wire(ell.toShape())
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, math.pi * 15 * 8, places=0)
-
-
-# =========================================================================
-# 2. Multiple wires on different planes
+# 1. Multiple wires on different planes
 # =========================================================================
 
 
 class TestDifferentPlanes(unittest.TestCase):
-    """Wires on different planes in one call. Cheese processes each
-    independently. FishEye should do the same."""
-
     def test_two_rects_xy_and_xz(self):
         w1 = make_polygon((0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0))
         w2 = make_polygon((20, 0, 0), (30, 0, 0), (30, 0, 10), (20, 0, 10))
@@ -113,93 +55,40 @@ class TestDifferentPlanes(unittest.TestCase):
         faces = fisheye([c1, c2])
         self.assertEqual(len(faces), 2)
 
-    def test_three_rects_xyz(self):
-        w_xy = make_polygon((0, 0, 0), (5, 0, 0), (5, 5, 0), (0, 5, 0))
-        w_xz = make_polygon((10, 0, 0), (15, 0, 0), (15, 0, 5), (10, 0, 5))
-        w_yz = make_polygon((0, 10, 0), (0, 15, 0), (0, 15, 5), (0, 10, 5))
-        faces = fisheye([w_xy, w_xz, w_yz])
-        self.assertEqual(len(faces), 3)
-        self.assertAlmostEqual(total_area(faces), 75.0, places=3)
-
 
 # =========================================================================
-# 3. Nesting on non-XY planes
-# =========================================================================
-
-
-class TestNestingNonXY(unittest.TestCase):
-    """Hole-in-face on non-XY planes."""
-
-    def test_circle_hole_on_xz(self):
-        """Rectangle with circular hole, both on XZ plane."""
-        outer = make_polygon((0, 0, 0), (20, 0, 0), (20, 0, 20), (0, 0, 20))
-        inner = Part.Wire(Part.makeCircle(5, Vec(10, 0, 10), Vec(0, 1, 0)))
-        faces = fisheye([outer, inner])
-        self.assertEqual(len(faces), 1)
-        expected = 400.0 - math.pi * 25
-        self.assertAlmostEqual(faces[0].Area, expected, places=0)
-
-    def test_concentric_circles_tilted(self):
-        """Two concentric circles on a tilted plane → annulus."""
-        normal = Vec(1, 1, 1)
-        center = Vec(0, 0, 0)
-        outer = Part.Wire(Part.makeCircle(10, center, normal))
-        inner = Part.Wire(Part.makeCircle(5, center, normal))
-        faces = fisheye([outer, inner])
-        self.assertEqual(len(faces), 1)
-        expected = math.pi * (100 - 25)
-        self.assertAlmostEqual(faces[0].Area, expected, places=1)
-
-
-# =========================================================================
-# 4. Analytical surfaces (cylinder wire, etc.)
+# 2. Analytical surfaces
 # =========================================================================
 
 
 class TestAnalyticalSurfaces(unittest.TestCase):
-    """Wires from analytical surfaces that MakeFace can auto-detect."""
-
-    def test_cylinder_lateral_wire(self):
-        """Outer wire of a cylinder lateral face → cylindrical face."""
+    def test_cylinder_lateral(self):
         cyl = Part.makeCylinder(10, 20)
         lateral = [f for f in cyl.Faces if f.Surface.TypeId == "Part::GeomCylinder"][0]
-        wire = lateral.OuterWire
-        faces = fisheye(wire)
+        faces = fisheye(lateral.OuterWire)
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 0)
 
-    def test_cone_lateral_wire(self):
-        """Outer wire of a cone lateral face."""
+    def test_cone_lateral(self):
         cone = Part.makeCone(10, 5, 20)
         lateral = [f for f in cone.Faces if f.Surface.TypeId == "Part::GeomCone"][0]
-        wire = lateral.OuterWire
-        faces = fisheye(wire)
+        faces = fisheye(lateral.OuterWire)
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 0)
 
 
 # =========================================================================
-# 5. Freeform non-planar surfaces (BRepFill_Filling)
+# 3. Freeform non-planar (BRepFill_Filling)
 # =========================================================================
 
 
 class TestFreeformSurfaces(unittest.TestCase):
-    """Wires whose vertices don't lie on any analytical surface.
-    These require BRepFill_Filling (variational BSpline patch)."""
-
     def test_twisted_quad(self):
-        """Quad with one vertex off-plane → warped surface."""
+        """Quad with one vertex off-plane."""
         w = make_polygon((0, 0, 0), (10, 0, 0), (10, 10, 5), (0, 10, 0))
         faces = fisheye(w)
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 100.0)
-
-    def test_pentagon_3d(self):
-        """Pentagon with all vertices at different Z."""
-        w = make_polygon((0, 0, 0), (10, 0, 2), (12, 8, 5), (5, 14, 3), (-2, 8, 1))
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertGreater(faces[0].Area, 0)
 
     def test_saddle_hexagon(self):
         """Hexagon with alternating Z (saddle shape)."""
@@ -214,31 +103,39 @@ class TestFreeformSurfaces(unittest.TestCase):
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 0)
 
-    def test_wavy_polygon(self):
-        """20-sided polygon with sinusoidal Z variation."""
-        n = 20
-        pts = []
-        for i in range(n):
-            a = 2 * math.pi * i / n
-            pts.append((10 * math.cos(a), 10 * math.sin(a), 3 * math.sin(2 * a)))
-        w = make_polygon(*pts)
-        faces = fisheye(w)
-        self.assertEqual(len(faces), 1)
-        self.assertGreater(faces[0].Area, 0)
-
     def test_bspline_wavy(self):
         """Closed BSpline with non-coplanar control points."""
         pts = [Vec(0, 0, 0), Vec(10, 0, 5), Vec(10, 10, -3), Vec(0, 10, 4)]
         bs = Part.BSplineCurve()
         bs.interpolate(pts, PeriodicFlag=True)
-        w = Part.Wire(bs.toShape())
+        faces = fisheye(Part.Wire(bs.toShape()))
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_steep_fold(self):
+        """Wire with a steep fold in Z."""
+        w = make_polygon((0, 0, 0), (10, 0, 0), (10, 5, 20), (10, 10, 0), (0, 10, 0))
         faces = fisheye(w)
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 0)
 
+    def test_two_separate_freeform(self):
+        """Two independent non-planar wires → 2 filled faces."""
+        w1 = make_polygon((0, 0, 0), (10, 0, 0), (10, 10, 5), (0, 10, 0))
+        w2 = make_polygon((20, 0, 0), (30, 0, 3), (30, 10, 0), (20, 10, 4))
+        faces = fisheye([w1, w2])
+        self.assertEqual(len(faces), 2)
+
+    def test_mixed_planar_and_freeform(self):
+        """Planar circle + freeform quad in one call → 2 faces."""
+        planar = Part.Wire(Part.makeCircle(5, Vec(0, 0, 0)))
+        freeform = make_polygon((20, 0, 0), (30, 0, 0), (30, 10, 5), (20, 10, 0))
+        faces = fisheye([planar, freeform])
+        self.assertEqual(len(faces), 2)
+
 
 # =========================================================================
-# 5. Edge cases
+# 4. Edge cases
 # =========================================================================
 
 
@@ -252,11 +149,9 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_bspline_coplanar_non_xy(self):
         """BSpline whose points are coplanar on a tilted plane."""
-        # All points on the plane X + Z = 10
         pts = [Vec(0, 0, 10), Vec(5, 5, 5), Vec(10, 0, 0), Vec(5, -5, 5)]
         bs = Part.BSplineCurve()
         bs.interpolate(pts, PeriodicFlag=True)
-        w = Part.Wire(bs.toShape())
-        faces = fisheye(w)
+        faces = fisheye(Part.Wire(bs.toShape()))
         self.assertEqual(len(faces), 1)
         self.assertGreater(faces[0].Area, 0)
