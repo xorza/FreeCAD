@@ -116,8 +116,11 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
     for (const auto& w : wires) {
         builder.Add(comp, w);
     }
+    // BRepLib_FindSurface with Tol=-1 is 5x lenient (accepts
+    // myTolReached < maxEdgeTol * 5). Check ToleranceReached()
+    // to reject near-planar geometry that isn't truly flat.
     BRepLib_FindSurface planeFinder(comp, -1, /*OnlyPlane=*/Standard_True);
-    if (!planeFinder.Found()) {
+    if (!planeFinder.Found() || planeFinder.ToleranceReached() > 1e-4) {
         return false;
     }
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
@@ -542,14 +545,13 @@ void FaceMakerFishEye::Build_Essence()
     }
 
     if (planar) {
-        // Fuse overlapping closed wires, then build planar faces
         wires = fuseOverlaps(wires);
         buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
-        // Non-planar: try MakeFace first (handles ruled surfaces like
-        // cylinders), fall back to BRepFill_Filling for freeform surfaces
-        for (const auto& w : wires) {
+        // Non-planar: try MakeFace (analytical surfaces like cylinders),
+        // then BRepFill_Filling (freeform BSpline patch)
+        for (const auto& w : myWires) {
             TopoDS_Face face = makeFaceFromWire(w);
             if (face.IsNull()) {
                 face = fillNonPlanar(w);

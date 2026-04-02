@@ -179,6 +179,65 @@ class TestAnalyticalSurfaces(unittest.TestCase):
 
 
 # =========================================================================
+# 5. Freeform non-planar surfaces (BRepFill_Filling)
+# =========================================================================
+
+
+class TestFreeformSurfaces(unittest.TestCase):
+    """Wires whose vertices don't lie on any analytical surface.
+    These require BRepFill_Filling (variational BSpline patch)."""
+
+    def test_twisted_quad(self):
+        """Quad with one vertex off-plane → warped surface."""
+        w = make_polygon((0, 0, 0), (10, 0, 0), (10, 10, 5), (0, 10, 0))
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 100.0)
+
+    def test_pentagon_3d(self):
+        """Pentagon with all vertices at different Z."""
+        w = make_polygon((0, 0, 0), (10, 0, 2), (12, 8, 5), (5, 14, 3), (-2, 8, 1))
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_saddle_hexagon(self):
+        """Hexagon with alternating Z (saddle shape)."""
+        r = 10
+        pts = []
+        for i in range(6):
+            a = i * math.pi / 3
+            z = 3 * (1 if i % 2 == 0 else -1)
+            pts.append((r * math.cos(a), r * math.sin(a), z))
+        w = make_polygon(*pts)
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_wavy_polygon(self):
+        """20-sided polygon with sinusoidal Z variation."""
+        n = 20
+        pts = []
+        for i in range(n):
+            a = 2 * math.pi * i / n
+            pts.append((10 * math.cos(a), 10 * math.sin(a), 3 * math.sin(2 * a)))
+        w = make_polygon(*pts)
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_bspline_wavy(self):
+        """Closed BSpline with non-coplanar control points."""
+        pts = [Vec(0, 0, 0), Vec(10, 0, 5), Vec(10, 10, -3), Vec(0, 10, 4)]
+        bs = Part.BSplineCurve()
+        bs.interpolate(pts, PeriodicFlag=True)
+        w = Part.Wire(bs.toShape())
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+
+# =========================================================================
 # 5. Edge cases
 # =========================================================================
 
