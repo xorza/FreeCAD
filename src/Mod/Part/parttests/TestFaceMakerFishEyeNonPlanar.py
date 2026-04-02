@@ -140,6 +140,13 @@ class TestFreeformSurfaces(unittest.TestCase):
 
 
 class TestEdgeCases(unittest.TestCase):
+    def test_xz_rectangle(self):
+        """Rectangle on XZ plane — regression test for gp_Dir2d bug."""
+        w = make_polygon((0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1))
+        faces = fisheye(w)
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 1.0, places=3)
+
     def test_near_planar(self):
         """Z offset below tolerance → treated as planar."""
         w = make_polygon((0, 0, 0), (10, 0, 0), (10, 10, 1e-8), (0, 10, 0))

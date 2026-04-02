@@ -37,6 +37,7 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <BRepTools.hxx>
@@ -110,15 +111,15 @@ double shapeArea(const TopoDS_Shape& s)
 
 bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
 {
+    // Copy wires to strip embedded surface info — BRepLib_FindSurface
+    // can return the edge's cached surface (e.g. sketch XY plane) instead
+    // of fitting to actual 3D positions. BRepBuilderAPI_Copy clears this.
     BRep_Builder builder;
     TopoDS_Compound comp;
     builder.MakeCompound(comp);
     for (const auto& w : wires) {
-        builder.Add(comp, w);
+        builder.Add(comp, BRepBuilderAPI_Copy(w).Shape());
     }
-    // BRepLib_FindSurface with Tol=-1 is 5x lenient (accepts
-    // myTolReached < maxEdgeTol * 5). Check ToleranceReached()
-    // to reject near-planar geometry that isn't truly flat.
     BRepLib_FindSurface planeFinder(comp, -1, /*OnlyPlane=*/Standard_True);
     if (!planeFinder.Found() || planeFinder.ToleranceReached() > Precision::Approximation()) {
         return false;
@@ -535,14 +536,14 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
-    // Detect the plane
+    // Always detect the plane from geometry — the supplied plane (from
+    // setPlane) may not match the actual edge coordinates. PartDesign
+    // transforms edges to global space but may supply the sketch-local plane.
     gp_Pln plane;
-    bool planar = planeSupplied;
-    if (planar) {
+    bool planar = findPlane(myWires, plane);
+    if (!planar && planeSupplied) {
         plane = myPlane;
-    }
-    else {
-        planar = findPlane(myWires, plane);
+        planar = true;
     }
 
     // Split self-intersecting BSplines (requires plane for 2D projection)
