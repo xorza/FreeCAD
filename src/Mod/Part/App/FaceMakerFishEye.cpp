@@ -39,6 +39,8 @@
 #include <Bnd_Box.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
+#include <Geom_Circle.hxx>
+#include <Geom_Line.hxx>
 #include <GeomAbs_Shape.hxx>
 #include <GeomAPI.hxx>
 #include <GProp_GProps.hxx>
@@ -145,6 +147,7 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
 
     std::vector<WireFace> wfs;
     wfs.reserve(n);
+    int closedCount = 0;
     for (const auto& w : inputWires) {
         WireFace wf;
         wf.wire = w;
@@ -152,8 +155,14 @@ std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& in
         if (wf.isValid()) {
             BRepBndLib::AddOptimal(w, wf.box, Standard_False);
             wf.area = shapeArea(wf.face);
+            ++closedCount;
         }
         wfs.push_back(std::move(wf));
+    }
+
+    // Need at least 2 closed wires for any overlap to be possible
+    if (closedCount < 2) {
+        return inputWires;
     }
 
     std::vector<int> parent(n);
@@ -325,16 +334,6 @@ TopoDS_Face fillNonPlanarWire(const TopoDS_Wire& wire)
     return {};
 }
 
-void buildNonPlanarFaces(const std::vector<TopoDS_Wire>& wires,
-                         std::vector<TopoDS_Shape>& result)
-{
-    for (const auto& w : wires) {
-        TopoDS_Face face = fillNonPlanarWire(w);
-        if (!face.IsNull()) {
-            result.push_back(face);
-        }
-    }
-}
 
 // ─── Pre-processing: split self-intersecting edges ─────────────────────────
 //
@@ -359,6 +358,14 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                 Standard_Real first, last;
                 Handle(Geom_Curve) curve3d = BRep_Tool::Curve(edge, first, last);
                 if (curve3d.IsNull()) {
+                    allEdges.Append(edge);
+                    continue;
+                }
+
+                // Lines, circles, and arcs never self-intersect — skip the
+                // expensive plane detection and 2D projection.
+                if (curve3d->IsKind(STANDARD_TYPE(Geom_Line))
+                    || curve3d->IsKind(STANDARD_TYPE(Geom_Circle))) {
                     allEdges.Append(edge);
                     continue;
                 }
@@ -525,6 +532,11 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
-    // Phase 3: Non-planar fallback
-    buildNonPlanarFaces(wires, myShapesToReturn);
+    // Phase 3: Non-planar fallback — try BRepFill_Filling on each wire
+    for (const auto& w : wires) {
+        TopoDS_Face face = fillNonPlanarWire(w);
+        if (!face.IsNull()) {
+            myShapesToReturn.push_back(face);
+        }
+    }
 }
