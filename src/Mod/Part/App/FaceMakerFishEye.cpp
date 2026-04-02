@@ -24,27 +24,30 @@
 
 #include "FaceMakerFishEye.h"
 
+#include <BOPAlgo_BuilderFace.hxx>
 #include <BOPAlgo_Tools.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
-#include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepAlgoAPI_Common.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLib.hxx>
+#include <BRepLib_FindSurface.hxx>
 #include <BRepTools.hxx>
 #include <Bnd_Box.hxx>
-#include <BRepLib_FindSurface.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
+#include <GeomAbs_Shape.hxx>
 #include <GeomAdaptor_Surface.hxx>
+#include <GeomAPI.hxx>
 #include <Geom_Conic.hxx>
 #include <Geom_Line.hxx>
-#include <GeomAbs_Shape.hxx>
-#include <GeomAPI.hxx>
 #include <GProp_GProps.hxx>
 #include <IntTools_Context.hxx>
 #include <Precision.hxx>
@@ -78,6 +81,8 @@ std::string FaceMakerFishEye::getBriefExplanation() const
                 .toStdString()};
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 namespace
 {
 
@@ -94,294 +99,12 @@ TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
     return {};
 }
 
-// ─── Phase 1: Fuse overlapping wires ─────────────────────────────────────────
-//
-// Detect partial overlaps (bounding box pre-filter + BRepAlgoAPI_Common),
-// group with union-find, fuse each group, extract outer wires.
-// Full containment (hole inside outer) is NOT fused — it's preserved
-// for even-odd nesting in Phase 2.
-
-struct WireFace
-{
-    TopoDS_Wire wire;
-    TopoDS_Face face;
-    Bnd_Box box;
-    double area {0.0};
-
-    bool isValid() const
-    {
-        return !face.IsNull();
-    }
-};
-
 double shapeArea(const TopoDS_Shape& s)
 {
     GProp_GProps props;
     BRepGProp::SurfaceProperties(s, props);
     return props.Mass();
 }
-
-bool hasPartialOverlap(const WireFace& a, const WireFace& b)
-{
-    if (a.box.IsOut(b.box)) {
-        return false;
-    }
-    BRepAlgoAPI_Common common(a.face, b.face);
-    if (!common.IsDone() || common.Shape().IsNull()) {
-        return false;
-    }
-    double commonArea = shapeArea(common.Shape());
-    double tol = Precision::Confusion();
-    return commonArea > tol && commonArea < a.area - tol && commonArea < b.area - tol;
-}
-
-int findRoot(std::vector<int>& parent, int i)
-{
-    while (parent[i] != i) {
-        parent[i] = parent[parent[i]];
-        i = parent[i];
-    }
-    return i;
-}
-
-void unite(std::vector<int>& parent, int a, int b)
-{
-    parent[findRoot(parent, a)] = findRoot(parent, b);
-}
-
-std::vector<TopoDS_Wire> fuseOverlappingWires(const std::vector<TopoDS_Wire>& inputWires)
-{
-    int n = static_cast<int>(inputWires.size());
-
-    std::vector<WireFace> wfs;
-    wfs.reserve(n);
-    int closedCount = 0;
-    for (const auto& w : inputWires) {
-        WireFace wf;
-        wf.wire = w;
-        // Only make faces from closed wires — open wires (dangling lines)
-        // can produce fake faces via BRepBuilderAPI_MakeFace that corrupt
-        // overlap detection.
-        if (BRep_Tool::IsClosed(w)) {
-            wf.face = makeFaceFromWire(w);
-        }
-        if (wf.isValid()) {
-            BRepBndLib::AddOptimal(w, wf.box, Standard_False);
-            wf.area = shapeArea(wf.face);
-            ++closedCount;
-        }
-        wfs.push_back(std::move(wf));
-    }
-
-    // Need at least 2 closed wires for any overlap to be possible
-    if (closedCount < 2) {
-        return inputWires;
-    }
-
-    std::vector<int> parent(n);
-    for (int i = 0; i < n; ++i) {
-        parent[i] = i;
-    }
-
-    bool hasOverlaps = false;
-    for (int i = 0; i < n; ++i) {
-        if (!wfs[i].isValid()) {
-            continue;
-        }
-        for (int j = i + 1; j < n; ++j) {
-            if (!wfs[j].isValid()) {
-                continue;
-            }
-            if (hasPartialOverlap(wfs[i], wfs[j])) {
-                unite(parent, i, j);
-                hasOverlaps = true;
-            }
-        }
-    }
-
-    if (!hasOverlaps) {
-        return inputWires;
-    }
-
-    std::map<int, std::vector<int>> groups;
-    for (int i = 0; i < n; ++i) {
-        groups[findRoot(parent, i)].push_back(i);
-    }
-
-    std::vector<TopoDS_Wire> result;
-    for (auto& [root, indices] : groups) {
-        if (indices.size() == 1) {
-            result.push_back(wfs[indices[0]].wire);
-            continue;
-        }
-
-        // Iterative pairwise fuse to get a true union
-        TopoDS_Shape fused;
-        bool fusedValid = false;
-        for (int idx : indices) {
-            if (!wfs[idx].isValid()) {
-                continue;
-            }
-            if (!fusedValid) {
-                fused = wfs[idx].face;
-                fusedValid = true;
-                continue;
-            }
-            BRepAlgoAPI_Fuse fuseOp(fused, wfs[idx].face);
-            if (fuseOp.IsDone() && !fuseOp.Shape().IsNull()) {
-                fused = fuseOp.Shape();
-            }
-        }
-
-        if (!fusedValid) {
-            for (int idx : indices) {
-                result.push_back(wfs[idx].wire);
-            }
-            continue;
-        }
-
-        for (TopExp_Explorer fExp(fused, TopAbs_FACE); fExp.More(); fExp.Next()) {
-            TopoDS_Wire outerWire = BRepTools::OuterWire(TopoDS::Face(fExp.Current()));
-            if (!outerWire.IsNull()) {
-                result.push_back(outerWire);
-            }
-        }
-    }
-
-    return result;
-}
-
-// ─── Phase 2: Planar face building ──────────────────────────────────────────
-//
-// EdgesToWires handles edge splitting internally. WiresToFaces builds all
-// face regions with hole nesting. Even-odd classification uses cached
-// IntTools_Context for fast 2D point-in-polygon tests.
-
-void buildPlanarFaces(const std::vector<TopoDS_Wire>& wires,
-                      std::vector<TopoDS_Shape>& result)
-{
-    // Collect all edges into a compound
-    BRep_Builder builder;
-    TopoDS_Compound edgeCompound;
-    builder.MakeCompound(edgeCompound);
-    for (const auto& w : wires) {
-        for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
-            builder.Add(edgeCompound, exp.Current());
-        }
-    }
-
-    // EdgesToWires: splits edges at intersections (internal BOPAlgo_Builder)
-    // and assembles into closed wires
-    TopoDS_Shape wireShape;
-    BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
-
-    // WiresToFaces: finds planes, builds pcurves, runs BOPAlgo_BuilderFace
-    TopoDS_Shape faceShape;
-    if (!BOPAlgo_Tools::WiresToFaces(wireShape, faceShape)) {
-        return;
-    }
-
-    // Collect all face regions, stripping internal wires left by
-    // BOPAlgo_BuilderFace::PerformInternalShapes (dangling edge remnants
-    // that would create degenerate geometry when extruded).
-    std::vector<TopoDS_Face> allFaces;
-    for (TopExp_Explorer exp(faceShape, TopAbs_FACE); exp.More(); exp.Next()) {
-        TopoDS_Face face = TopoDS::Face(exp.Current());
-        bool hasInternal = false;
-        for (TopExp_Explorer eExp(face, TopAbs_EDGE); eExp.More(); eExp.Next()) {
-            if (eExp.Current().Orientation() == TopAbs_INTERNAL) {
-                hasInternal = true;
-                break;
-            }
-        }
-        if (hasInternal) {
-            // Rebuild face without wires that contain internal edges
-            BRep_Builder fb;
-            TopoDS_Face cleaned;
-            fb.MakeFace(cleaned, BRep_Tool::Surface(face), BRep_Tool::Tolerance(face));
-            for (TopExp_Explorer wExp(face, TopAbs_WIRE); wExp.More(); wExp.Next()) {
-                bool allInternal = true;
-                for (TopExp_Explorer eExp(wExp.Current(), TopAbs_EDGE); eExp.More();
-                     eExp.Next()) {
-                    if (eExp.Current().Orientation() != TopAbs_INTERNAL) {
-                        allInternal = false;
-                        break;
-                    }
-                }
-                if (!allInternal) {
-                    fb.Add(cleaned, wExp.Current());
-                }
-            }
-            allFaces.push_back(cleaned);
-        }
-        else {
-            allFaces.push_back(face);
-        }
-    }
-    if (allFaces.empty()) {
-        return;
-    }
-
-    // Even-odd nesting: keep faces whose interior point is inside an
-    // odd number of input wires. Uses IntTools_Context for cached
-    // 2D point-in-polygon classification.
-    // Even-odd nesting: keep faces whose interior point is inside an
-    // odd number of input wires. Faces not inside ANY wire are kept
-    // unconditionally — they come from geometry that can't form reference
-    // faces (self-intersecting BSplines, etc.).
-    Handle(IntTools_Context) ctx = new IntTools_Context();
-    std::vector<TopoDS_Face> wireFaces;
-    wireFaces.reserve(wires.size());
-    for (const auto& w : wires) {
-        wireFaces.push_back(BRep_Tool::IsClosed(w) ? makeFaceFromWire(w) : TopoDS_Face());
-    }
-
-    for (const auto& face : allFaces) {
-        gp_Pnt interiorPt;
-        gp_Pnt2d interiorPt2d;
-        if (BOPTools_AlgoTools3D::PointInFace(face, interiorPt, interiorPt2d, ctx) != 0) {
-            FC_WARN("PointInFace failed, keeping face without classification");
-            result.push_back(face);
-            continue;
-        }
-
-        int containCount = 0;
-        for (const auto& wf : wireFaces) {
-            if (wf.IsNull()) {
-                continue;
-            }
-            if (ctx->IsPointInFace(interiorPt, wf, Precision::Confusion())) {
-                ++containCount;
-            }
-        }
-
-        if (containCount == 0 || containCount % 2 == 1) {
-            result.push_back(face);
-        }
-    }
-
-}
-
-// ─── Non-planar fallback: BRepFill_Filling (N-sided patch) ──────────────────
-
-TopoDS_Face fillNonPlanarWire(const TopoDS_Wire& wire)
-{
-    try {
-        BRepFill_Filling filler;
-        for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next()) {
-            filler.Add(TopoDS::Edge(ex.Current()), GeomAbs_C0);
-        }
-        filler.Build();
-        if (filler.IsDone()) {
-            return filler.Face();
-        }
-    }
-    catch (...) {
-        FC_WARN("BRepFill_Filling failed for non-planar wire");
-    }
-    return {};
-}
-
 
 // ─── Plane detection ────────────────────────────────────────────────────────
 
@@ -401,20 +124,17 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
     return true;
 }
 
-// ─── Pre-processing: split self-intersecting edges ─────────────────────────
+// ─── Self-intersection splitting ────────────────────────────────────────────
 //
-// A single BSpline that crosses itself (e.g. figure-8) needs to be split
-// at the crossing points before the main pipeline can process it.
-// Uses Geom2dAPI_InterCurveCurve to detect self-intersections in 2D,
-// splits into sub-edges, then reassembles into multiple wires via
-// BOPAlgo_Tools::EdgesToWires.
+// BSplines that cross themselves (figure-8) must be split at the crossing
+// before the face pipeline can produce separate lobes.
 
-std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wire>& inputWires,
-                                                    const gp_Pln& plane)
+std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& inputWires,
+                                               const gp_Pln& plane)
 {
     const Standard_Real tol = Precision::Confusion();
     std::vector<TopoDS_Wire> result;
-    TopTools_ListOfShape splitEdges;  // edges only from wires that had splits
+    TopTools_ListOfShape splitEdges;
 
     for (const auto& wire : inputWires) {
         bool wireSplit = false;
@@ -422,17 +142,16 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
 
         for (TopExp_Explorer exp(wire, TopAbs_EDGE); exp.More(); exp.Next()) {
             const TopoDS_Edge& edge = TopoDS::Edge(exp.Current());
-
             try {
                 Standard_Real first, last;
-                Handle(Geom_Curve) curve3d = BRep_Tool::Curve(edge, first, last);
-                if (curve3d.IsNull() || curve3d->IsKind(STANDARD_TYPE(Geom_Line))
-                    || curve3d->IsKind(STANDARD_TYPE(Geom_Conic))) {
+                Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, first, last);
+                if (curve.IsNull() || curve->IsKind(STANDARD_TYPE(Geom_Line))
+                    || curve->IsKind(STANDARD_TYPE(Geom_Conic))) {
                     wireEdges.Append(edge);
                     continue;
                 }
 
-                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, plane);
+                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve, plane);
                 if (curve2d.IsNull()) {
                     wireEdges.Append(edge);
                     continue;
@@ -444,6 +163,7 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     continue;
                 }
 
+                // Collect crossing parameters
                 std::vector<Standard_Real> params;
                 for (int i = 1; i <= selfInt.NbPoints(); i++) {
                     Geom2dAPI_ProjectPointOnCurve proj(selfInt.Point(i), curve2d, first, last);
@@ -465,11 +185,12 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                                 [tol](double a, double b) { return b - a < tol; }),
                     params.end());
 
+                // Split into sub-edges
                 Standard_Real prev = first;
                 bool didSplit = false;
                 for (Standard_Real p : params) {
                     if (p - prev > tol) {
-                        BRepBuilderAPI_MakeEdge me(curve3d, prev, p);
+                        BRepBuilderAPI_MakeEdge me(curve, prev, p);
                         if (me.IsDone()) {
                             wireEdges.Append(me.Edge());
                             didSplit = true;
@@ -478,17 +199,18 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
                     }
                 }
                 if (last - prev > tol) {
-                    BRepBuilderAPI_MakeEdge me(curve3d, prev, last);
+                    BRepBuilderAPI_MakeEdge me(curve, prev, last);
                     if (me.IsDone()) {
                         wireEdges.Append(me.Edge());
                         didSplit = true;
                     }
                 }
-                if (!didSplit) {
-                    wireEdges.Append(edge);
+
+                if (didSplit) {
+                    wireSplit = true;
                 }
                 else {
-                    wireSplit = true;
+                    wireEdges.Append(edge);
                 }
             }
             catch (...) {
@@ -497,13 +219,11 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
         }
 
         if (wireSplit) {
-            // Reassemble split edges into wires via EdgesToWires
             for (TopTools_ListIteratorOfListOfShape it(wireEdges); it.More(); it.Next()) {
                 splitEdges.Append(it.Value());
             }
         }
         else {
-            // Keep the original wire unchanged
             result.push_back(wire);
         }
     }
@@ -512,26 +232,292 @@ std::vector<TopoDS_Wire> splitSelfIntersectingWires(const std::vector<TopoDS_Wir
         return inputWires;
     }
 
-    // Only reassemble wires that had self-intersecting edges
+    // Reassemble split edges into wires (EdgesToWires creates shared vertices
+    // at crossing points via its internal BOPAlgo_Builder)
     BRep_Builder builder;
-    TopoDS_Compound edgeCompound;
-    builder.MakeCompound(edgeCompound);
+    TopoDS_Compound comp;
+    builder.MakeCompound(comp);
     for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-        builder.Add(edgeCompound, it.Value());
+        builder.Add(comp, it.Value());
     }
-
     TopoDS_Shape wireShape;
-    BOPAlgo_Tools::EdgesToWires(edgeCompound, wireShape);
-
+    BOPAlgo_Tools::EdgesToWires(comp, wireShape);
     for (TopExp_Explorer exp(wireShape, TopAbs_WIRE); exp.More(); exp.Next()) {
         result.push_back(TopoDS::Wire(exp.Current()));
     }
     return result;
 }
 
+// ─── Overlap fusing ─────────────────────────────────────────────────────────
+//
+// Partially overlapping closed wires are fused into their union so that
+// even-odd classification can treat each Venn region independently.
+// Full containment (hole inside outer) is preserved for even-odd nesting.
+
+int findRoot(std::vector<int>& parent, int i)
+{
+    while (parent[i] != i) {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+    }
+    return i;
+}
+
+void unite(std::vector<int>& parent, int a, int b)
+{
+    parent[findRoot(parent, a)] = findRoot(parent, b);
+}
+
+struct WireFace
+{
+    TopoDS_Wire wire;
+    TopoDS_Face face;
+    Bnd_Box box;
+    double area {0.0};
+};
+
+std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires)
+{
+    int n = static_cast<int>(inputWires.size());
+
+    // Build faces only from closed wires — open wires produce fake faces
+    std::vector<WireFace> wfs;
+    wfs.reserve(n);
+    int closedCount = 0;
+    for (const auto& w : inputWires) {
+        WireFace wf;
+        wf.wire = w;
+        if (BRep_Tool::IsClosed(w)) {
+            wf.face = makeFaceFromWire(w);
+            if (!wf.face.IsNull()) {
+                BRepBndLib::AddOptimal(w, wf.box, Standard_False);
+                wf.area = shapeArea(wf.face);
+                ++closedCount;
+            }
+        }
+        wfs.push_back(std::move(wf));
+    }
+    if (closedCount < 2) {
+        return inputWires;
+    }
+
+    // Pairwise overlap detection with bbox pre-filter
+    std::vector<int> parent(n);
+    std::iota(parent.begin(), parent.end(), 0);
+    bool hasOverlaps = false;
+
+    for (int i = 0; i < n; ++i) {
+        if (wfs[i].face.IsNull()) {
+            continue;
+        }
+        for (int j = i + 1; j < n; ++j) {
+            if (wfs[j].face.IsNull() || wfs[i].box.IsOut(wfs[j].box)) {
+                continue;
+            }
+            BRepAlgoAPI_Common common(wfs[i].face, wfs[j].face);
+            if (!common.IsDone() || common.Shape().IsNull()) {
+                continue;
+            }
+            double ca = shapeArea(common.Shape());
+            double tol = Precision::Confusion();
+            if (ca > tol && ca < wfs[i].area - tol && ca < wfs[j].area - tol) {
+                unite(parent, i, j);
+                hasOverlaps = true;
+            }
+        }
+    }
+    if (!hasOverlaps) {
+        return inputWires;
+    }
+
+    // Fuse each overlap group
+    std::map<int, std::vector<int>> groups;
+    for (int i = 0; i < n; ++i) {
+        groups[findRoot(parent, i)].push_back(i);
+    }
+
+    std::vector<TopoDS_Wire> result;
+    for (auto& [root, indices] : groups) {
+        if (indices.size() == 1) {
+            result.push_back(wfs[indices[0]].wire);
+            continue;
+        }
+        TopoDS_Shape fused;
+        bool valid = false;
+        for (int idx : indices) {
+            if (wfs[idx].face.IsNull()) {
+                continue;
+            }
+            if (!valid) {
+                fused = wfs[idx].face;
+                valid = true;
+            }
+            else {
+                BRepAlgoAPI_Fuse fuseOp(fused, wfs[idx].face);
+                if (fuseOp.IsDone() && !fuseOp.Shape().IsNull()) {
+                    fused = fuseOp.Shape();
+                }
+            }
+        }
+        if (!valid) {
+            for (int idx : indices) {
+                result.push_back(wfs[idx].wire);
+            }
+            continue;
+        }
+        for (TopExp_Explorer fExp(fused, TopAbs_FACE); fExp.More(); fExp.Next()) {
+            TopoDS_Wire outerWire = BRepTools::OuterWire(TopoDS::Face(fExp.Current()));
+            if (!outerWire.IsNull()) {
+                result.push_back(outerWire);
+            }
+        }
+    }
+    return result;
+}
+
+// ─── Planar face building ───────────────────────────────────────────────────
+//
+// Pipeline: BRepAlgoAPI_BuilderAlgo (split edges at intersections)
+//         → BOPAlgo_BuilderFace (find all bounded regions via WireSplitter)
+//         → even-odd classification (nesting/holes)
+//
+// Uses BuilderFace directly instead of EdgesToWires + WiresToFaces.
+// WireSplitter handles degree-4 vertices from self-intersecting curves
+// (splitting figure-8 into 2 lobes via angular sorting).
+
+void buildPlanar(const std::vector<TopoDS_Wire>& wires,
+                 const gp_Pln& plane,
+                 std::vector<TopoDS_Shape>& result)
+{
+    // Collect all edges
+    TopTools_ListOfShape edges;
+    for (const auto& w : wires) {
+        for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+            edges.Append(exp.Current());
+        }
+    }
+    if (edges.IsEmpty()) {
+        return;
+    }
+
+    // Split edges at mutual intersections
+    TopTools_ListOfShape splitEdges;
+    if (edges.Size() > 1) {
+        BRepAlgoAPI_BuilderAlgo splitter;
+        splitter.SetArguments(edges);
+        splitter.SetRunParallel(true);
+        splitter.SetNonDestructive(Standard_True);
+        splitter.Build();
+        if (splitter.IsDone()) {
+            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
+                splitEdges.Append(exp.Current());
+            }
+        }
+        else {
+            splitEdges = edges;
+        }
+    }
+    else {
+        splitEdges = edges;
+    }
+
+    // Build base face and PCurves
+    const Standard_Real aMax = 1.0e8;
+    TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
+    baseFace.Orientation(TopAbs_FORWARD);
+
+    TopTools_ListOfShape faceEdges;
+    for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+        const TopoDS_Edge& e = TopoDS::Edge(it.Value());
+        faceEdges.Append(e.Oriented(TopAbs_FORWARD));
+        faceEdges.Append(e.Oriented(TopAbs_REVERSED));
+    }
+    BRepLib::BuildPCurveForEdgesOnPlane(faceEdges, baseFace);
+
+    // BOPAlgo_BuilderFace: finds all bounded face regions.
+    // SetAvoidInternalShapes prevents dangling edges from becoming
+    // internal wires that create degenerate geometry when extruded.
+    BOPAlgo_BuilderFace faceBuilder;
+    faceBuilder.SetFace(baseFace);
+    faceBuilder.SetShapes(faceEdges);
+    faceBuilder.SetAvoidInternalShapes(Standard_True);
+    faceBuilder.Perform();
+    if (faceBuilder.HasErrors()) {
+        return;
+    }
+
+    // Collect bounded faces, skip the unbounded outer face and degenerate faces
+    const double outerThreshold = aMax * aMax;
+    std::vector<TopoDS_Face> allFaces;
+    for (TopTools_ListIteratorOfListOfShape it(faceBuilder.Areas()); it.More(); it.Next()) {
+        Bnd_Box box;
+        BRepBndLib::Add(it.Value(), box);
+        if (box.SquareExtent() > outerThreshold) {
+            continue;
+        }
+        if (shapeArea(it.Value()) < Precision::Confusion()) {
+            continue;
+        }
+        allFaces.push_back(TopoDS::Face(it.Value()));
+    }
+    if (allFaces.empty()) {
+        return;
+    }
+
+    // Even-odd classification: keep faces inside an odd number of input wires.
+    // Faces not inside ANY wire (count=0) are kept unconditionally — they come
+    // from geometry whose wires can't form reference faces (BSpline lobes etc).
+    Handle(IntTools_Context) ctx = new IntTools_Context();
+    std::vector<TopoDS_Face> wireFaces;
+    wireFaces.reserve(wires.size());
+    for (const auto& w : wires) {
+        wireFaces.push_back(BRep_Tool::IsClosed(w) ? makeFaceFromWire(w) : TopoDS_Face());
+    }
+
+    for (const auto& face : allFaces) {
+        gp_Pnt pt;
+        gp_Pnt2d pt2d;
+        if (BOPTools_AlgoTools3D::PointInFace(face, pt, pt2d, ctx) != 0) {
+            result.push_back(face);
+            continue;
+        }
+
+        int count = 0;
+        for (const auto& wf : wireFaces) {
+            if (!wf.IsNull() && ctx->IsPointInFace(pt, wf, Precision::Confusion())) {
+                ++count;
+            }
+        }
+
+        if (count == 0 || count % 2 == 1) {
+            result.push_back(face);
+        }
+    }
+}
+
+// ─── Non-planar fallback ────────────────────────────────────────────────────
+
+TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
+{
+    try {
+        BRepFill_Filling filler;
+        for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next()) {
+            filler.Add(TopoDS::Edge(ex.Current()), GeomAbs_C0);
+        }
+        filler.Build();
+        if (filler.IsDone()) {
+            return filler.Face();
+        }
+    }
+    catch (...) {
+        FC_WARN("BRepFill_Filling failed for non-planar wire");
+    }
+    return {};
+}
+
 }  // namespace
 
-// ─── Build_Essence ───────────────────────────────────────────────────────────
+// ─── Build_Essence ──────────────────────────────────────────────────────────
 
 void FaceMakerFishEye::Build_Essence()
 {
@@ -539,48 +525,35 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
-    // Detect the plane from geometry (or use the externally supplied one)
+    // Detect the plane
     gp_Pln plane;
-    bool havePlane = planeSupplied;
-    if (havePlane) {
+    bool planar = planeSupplied;
+    if (planar) {
         plane = myPlane;
     }
     else {
-        havePlane = findPlane(myWires, plane);
+        planar = findPlane(myWires, plane);
     }
 
-    // Pre-process: split self-intersecting edges into separate wires
+    // Split self-intersecting BSplines (requires plane for 2D projection)
     std::vector<TopoDS_Wire> wires = myWires;
-    if (havePlane) {
-        wires = splitSelfIntersectingWires(myWires, plane);
+    if (planar) {
+        wires = splitSelfIntersecting(myWires, plane);
     }
 
-    // Fast path: single wire needs no overlap detection or even-odd classification
-    if (wires.size() == 1) {
-        TopoDS_Face face = makeFaceFromWire(wires.front());
-        if (!face.IsNull()) {
-            myShapesToReturn.push_back(face);
-            return;
-        }
-        // Planar MakeFace failed — try non-planar filling
-        face = fillNonPlanarWire(wires.front());
-        if (!face.IsNull()) {
-            myShapesToReturn.push_back(face);
-            return;
-        }
-    }
-
-    // Phase 1: Fuse overlapping wires (union semantics for crossing wires)
-    wires = fuseOverlappingWires(wires);
-
-    if (havePlane) {
-        // Phase 2: Planar face building with even-odd nesting
-        buildPlanarFaces(wires, myShapesToReturn);
+    if (planar) {
+        // Fuse overlapping closed wires, then build planar faces
+        wires = fuseOverlaps(wires);
+        buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
-        // Phase 3: Non-planar fallback — try BRepFill_Filling on each wire
+        // Non-planar: try MakeFace first (handles ruled surfaces like
+        // cylinders), fall back to BRepFill_Filling for freeform surfaces
         for (const auto& w : wires) {
-            TopoDS_Face face = fillNonPlanarWire(w);
+            TopoDS_Face face = makeFaceFromWire(w);
+            if (face.IsNull()) {
+                face = fillNonPlanar(w);
+            }
             if (!face.IsNull()) {
                 myShapesToReturn.push_back(face);
             }
