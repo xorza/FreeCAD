@@ -27,14 +27,22 @@
 #include <Bnd_Box.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
+#include <Geom2dAPI_InterCurveCurve.hxx>
+#include <Geom2dAPI_ProjectPointOnCurve.hxx>
 #include <GeomAdaptor_Surface.hxx>
+#include <GeomAPI.hxx>
+#include <Precision.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
+
+#include <algorithm>
 
 #include <Base/Console.h>
 
@@ -73,7 +81,87 @@ void Part::FaceMakerBuildFace::Build_Essence()
         return;
     }
 
-    // Step 2: Split edges at all mutual intersections
+    // Step 2: Split self-intersecting edges, then split all edges at mutual intersections.
+
+    // Step 2a: Detect self-intersecting edges and split them at crossing points.
+    // BRepAlgoAPI_BuilderAlgo only splits edges against OTHER edges, not an edge
+    // against itself (e.g., a figure-8 BSpline).
+    {
+        TopTools_ListOfShape expanded;
+        const Standard_Real tol = Precision::Confusion();
+        for (TopTools_ListIteratorOfListOfShape it(edgeList); it.More(); it.Next()) {
+            const TopoDS_Edge& edge = TopoDS::Edge(it.Value());
+            Standard_Real first, last;
+            Handle(Geom_Curve) curve3d = BRep_Tool::Curve(edge, first, last);
+            if (curve3d.IsNull()) {
+                expanded.Append(edge);
+                continue;
+            }
+
+            // Project 3D curve to 2D for self-intersection detection
+            gp_Pln xyPlane;
+            Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve3d, xyPlane);
+            if (curve2d.IsNull()) {
+                expanded.Append(edge);
+                continue;
+            }
+
+            Geom2dAPI_InterCurveCurve selfInt(curve2d, tol);
+            if (selfInt.NbPoints() == 0) {
+                expanded.Append(edge);
+                continue;
+            }
+
+            // For each self-intersection point, find ALL parameter values
+            // where the curve passes through it (a crossing has 2 parameters).
+            std::vector<Standard_Real> params;
+            for (int i = 1; i <= selfInt.NbPoints(); i++) {
+                Geom2dAPI_ProjectPointOnCurve proj(selfInt.Point(i), curve2d, first, last);
+                for (int j = 1; j <= proj.NbPoints(); j++) {
+                    Standard_Real p = proj.Parameter(j);
+                    if (p - first > tol && last - p > tol) {
+                        params.push_back(p);
+                    }
+                }
+            }
+            if (params.empty()) {
+                expanded.Append(edge);
+                continue;
+            }
+
+            // Sort and deduplicate, then split into sub-edges
+            std::sort(params.begin(), params.end());
+            params.erase(std::unique(params.begin(), params.end(),
+                                     [tol](double a, double b) { return b - a < tol; }),
+                         params.end());
+
+            Standard_Real prev = first;
+            bool didSplit = false;
+            for (Standard_Real p : params) {
+                if (p - prev > tol) {
+                    BRepBuilderAPI_MakeEdge me(curve3d, prev, p);
+                    if (me.IsDone()) {
+                        expanded.Append(me.Edge());
+                        didSplit = true;
+                    }
+                    prev = p;
+                }
+            }
+            if (last - prev > tol) {
+                BRepBuilderAPI_MakeEdge me(curve3d, prev, last);
+                if (me.IsDone()) {
+                    expanded.Append(me.Edge());
+                    didSplit = true;
+                }
+            }
+            if (!didSplit) {
+                expanded.Append(edge);
+            }
+        }
+        edgeList = expanded;
+    }
+
+    // Step 2b: Split all edges at mutual intersections and merge shared vertices
     TopTools_ListOfShape splitEdges;
     if (edgeList.Size() > 1) {
         BRepAlgoAPI_BuilderAlgo splitter;

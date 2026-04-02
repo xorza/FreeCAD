@@ -493,3 +493,105 @@ class TestSketchInternalFaces(unittest.TestCase):
         face_names = [name for name in shape.ElementReverseMap.keys() if name.startswith("Face")]
         self.assertEqual(len(face_names), len(set(face_names)))
         self.assertEqual(len(face_names), 3, "Should have 3 face names for 3 faces")
+
+    # ==================================================================
+    # 12. Self-intersecting geometry
+    # ==================================================================
+
+    def testBowtie(self):
+        """Bowtie/hourglass: two triangles sharing a single vertex at origin."""
+        sk = self._make_sketch()
+        i = add_triangle(sk, (-10, -5), (-10, 5), (0, 0))
+        j = add_triangle(sk, (0, 0), (10, 5), (10, -5))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i + 1, 2, j, 1))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 2)
+        self.assertAlmostEqual(total_face_area(faces), 100.0, places=1)
+
+    def testFigure8CrossingEdges(self):
+        """Figure-8 from crossing line segments (X closed on sides).
+        Diagonals cross without a shared vertex — tests mutual edge splitting."""
+        sk = self._make_sketch()
+        i = int(sk.GeometryCount)
+        sk.addGeometry(Part.LineSegment(App.Vector(-10, -5, 0), App.Vector(10, 5, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(10, 5, 0), App.Vector(10, -5, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(10, -5, 0), App.Vector(-10, 5, 0)))
+        sk.addGeometry(Part.LineSegment(App.Vector(-10, 5, 0), App.Vector(-10, -5, 0)))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i, 2, i + 1, 1))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i + 1, 2, i + 2, 1))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i + 2, 2, i + 3, 1))
+        sk.addConstraint(Sketcher.Constraint("Coincident", i + 3, 2, i, 1))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(total_face_area(faces), 0)
+
+    def testFigure8BSpline(self):
+        """Single self-intersecting BSpline (figure-8 shape).
+        Tests self-intersection detection and splitting in FaceMakerBuildFace."""
+        sk = self._make_sketch()
+        i = int(sk.GeometryCount)
+        ctrl_pts = [
+            (0, 26.06), (14.6, 15.54), (0.51, 0), (-16.13, -17.23),
+            (0, -24.02), (17.15, -9.42), (-16.64, 15.20), (0, 26.06),
+        ]
+        for cx, cy in ctrl_pts:
+            sk.addGeometry(
+                Part.Circle(App.Vector(cx, cy, 0), App.Vector(0, 0, 1), 10), True
+            )
+        bsp = Part.BSplineCurve(
+            [App.Vector(cx, cy, 0) for cx, cy in ctrl_pts],
+            None, None, False, 3,
+            [1] * len(ctrl_pts), False,
+        )
+        sk.addGeometry(bsp, False)
+        bspIdx = int(sk.GeometryCount) - 1
+        for cp in range(len(ctrl_pts)):
+            sk.addConstraint(
+                Sketcher.Constraint(
+                    "InternalAlignment:Sketcher::BSplineControlPoint",
+                    i + cp, 3, bspIdx, cp,
+                )
+            )
+        sk.exposeInternalGeometry(bspIdx)
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(total_face_area(faces), 0)
+
+    def testSelfIntersectingBSplineWithCircle(self):
+        """Figure-8 BSpline plus a circle overlapping one lobe.
+        Tests interaction of self-intersection splitting and mutual splitting."""
+        sk = self._make_sketch()
+        i = int(sk.GeometryCount)
+        ctrl_pts = [
+            (0, 26.06), (14.6, 15.54), (0.51, 0), (-16.13, -17.23),
+            (0, -24.02), (17.15, -9.42), (-16.64, 15.20), (0, 26.06),
+        ]
+        for cx, cy in ctrl_pts:
+            sk.addGeometry(
+                Part.Circle(App.Vector(cx, cy, 0), App.Vector(0, 0, 1), 10), True
+            )
+        bsp = Part.BSplineCurve(
+            [App.Vector(cx, cy, 0) for cx, cy in ctrl_pts],
+            None, None, False, 3,
+            [1] * len(ctrl_pts), False,
+        )
+        sk.addGeometry(bsp, False)
+        bspIdx = int(sk.GeometryCount) - 1
+        for cp in range(len(ctrl_pts)):
+            sk.addConstraint(
+                Sketcher.Constraint(
+                    "InternalAlignment:Sketcher::BSplineControlPoint",
+                    i + cp, 3, bspIdx, cp,
+                )
+            )
+        sk.exposeInternalGeometry(bspIdx)
+        # Add a circle overlapping the upper lobe
+        add_circle(sk, 0, 20, 12)
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        # At least: 2 lobes from figure-8 split by circle = 3+ faces
+        self.assertGreaterEqual(len(faces), 3)
+        self.assertGreater(total_face_area(faces), 0)
