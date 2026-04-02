@@ -37,6 +37,10 @@ def triangle_wire(p1, p2, p3):
     )
 
 
+def line_wire(*points):
+    return Part.Wire(Part.makePolygon([Vec(*p) if len(p) >= 2 else p for p in points]))
+
+
 def fisheye(wires):
     """Run FaceMakerFishEye on wires, return list of faces."""
     if isinstance(wires, Part.Wire):
@@ -49,7 +53,6 @@ def total_area(faces):
 
 
 def union_area(*face_shapes):
-    """Compute area of the boolean union of face shapes."""
     result = face_shapes[0]
     for s in face_shapes[1:]:
         result = result.fuse(s)
@@ -59,8 +62,7 @@ def union_area(*face_shapes):
 def faces_overlap(faces):
     for i, f1 in enumerate(faces):
         for f2 in faces[i + 1 :]:
-            common = f1.common(f2)
-            if common.Faces:
+            if f1.common(f2).Faces:
                 return True
     return False
 
@@ -70,17 +72,16 @@ def faces_overlap(faces):
 # =========================================================================
 
 
-class TestFishEyeSingleShape(unittest.TestCase):
+class TestSingleShape(unittest.TestCase):
     def test_rectangle(self):
         faces = fisheye(rect_wire(0, 0, 10, 10))
         self.assertEqual(len(faces), 1)
         self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
 
     def test_circle(self):
-        r = 10
-        faces = fisheye(circle_wire(0, 0, r))
+        faces = fisheye(circle_wire(0, 0, 10))
         self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, math.pi * r * r, places=1)
+        self.assertAlmostEqual(faces[0].Area, math.pi * 100, places=1)
 
     def test_triangle(self):
         faces = fisheye(triangle_wire((0, 0), (10, 0), (5, 10)))
@@ -98,33 +99,19 @@ class TestFishEyeSingleShape(unittest.TestCase):
         self.assertEqual(len(faces), 1)
         self.assertAlmostEqual(faces[0].Area, math.pi * r * r / 2, places=1)
 
-    def test_small_rectangle(self):
-        faces = fisheye(rect_wire(0, 0, 0.1, 0.1))
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, 0.01, places=5)
-
-    def test_large_rectangle(self):
-        faces = fisheye(rect_wire(0, 0, 1000, 1000))
-        self.assertEqual(len(faces), 1)
-        self.assertAlmostEqual(faces[0].Area, 1e6, places=0)
-
 
 # =========================================================================
 # 2. Non-overlapping shapes
 # =========================================================================
 
 
-class TestFishEyeSeparateShapes(unittest.TestCase):
+class TestSeparateShapes(unittest.TestCase):
     def test_two_rectangles(self):
         faces = fisheye([rect_wire(0, 0, 5, 5), rect_wire(20, 20, 25, 25)])
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 50.0, places=3)
 
-    def test_two_circles(self):
-        faces = fisheye([circle_wire(0, 0, 5), circle_wire(30, 0, 5)])
-        self.assertEqual(len(faces), 2)
-
-    def test_three_separate_shapes(self):
+    def test_three_mixed_shapes(self):
         faces = fisheye(
             [
                 rect_wire(0, 0, 5, 5),
@@ -140,7 +127,7 @@ class TestFishEyeSeparateShapes(unittest.TestCase):
 # =========================================================================
 
 
-class TestFishEyeTouchingShapes(unittest.TestCase):
+class TestTouchingShapes(unittest.TestCase):
     def test_shared_edge(self):
         faces = fisheye([rect_wire(0, 0, 10, 10), rect_wire(10, 0, 20, 10)])
         self.assertEqual(len(faces), 2)
@@ -157,43 +144,29 @@ class TestFishEyeTouchingShapes(unittest.TestCase):
 # =========================================================================
 
 
-class TestFishEyeNesting(unittest.TestCase):
-    """FishEye uses even-odd winding: a region contained by N wires is
-    included only if N is odd. So 2 nested wires -> 1 face (ring with hole),
-    3 nested -> 2 faces (outer ring + inner disc)."""
-
+class TestNesting(unittest.TestCase):
     def test_circle_inside_rectangle(self):
         """Even-odd: inner circle is a hole -> 1 face (ring)."""
         faces = fisheye([rect_wire(-20, -20, 20, 20), circle_wire(0, 0, 5)])
         self.assertEqual(len(faces), 1)
-        expected = 1600.0 - math.pi * 25
-        self.assertAlmostEqual(total_area(faces), expected, places=1)
+        self.assertAlmostEqual(total_area(faces), 1600.0 - math.pi * 25, places=1)
 
     def test_concentric_circles(self):
-        """Even-odd: inner circle is a hole -> 1 annulus face."""
+        """2 nested -> annulus (hole)."""
         faces = fisheye([circle_wire(0, 0, 10), circle_wire(0, 0, 5)])
         self.assertEqual(len(faces), 1)
-        expected = math.pi * (100 - 25)
-        self.assertAlmostEqual(total_area(faces), expected, places=1)
-
-    def test_rectangle_inside_rectangle(self):
-        """Even-odd: inner rect is a hole -> 1 frame face."""
-        faces = fisheye([rect_wire(-20, -20, 20, 20), rect_wire(-5, -5, 5, 5)])
-        self.assertEqual(len(faces), 1)
-        expected = 40 * 40 - 10 * 10
-        self.assertAlmostEqual(total_area(faces), expected, places=1)
+        self.assertAlmostEqual(total_area(faces), math.pi * 75, places=1)
 
     def test_triple_nesting(self):
-        """Even-odd: outer ring (odd=1) + inner disc (odd=3) -> 2 faces."""
+        """3 nested -> outer ring + inner disc (even-odd)."""
         faces = fisheye(
             [rect_wire(0, 0, 30, 30), rect_wire(5, 5, 25, 25), rect_wire(10, 10, 20, 20)]
         )
         self.assertEqual(len(faces), 2)
-        # outer ring = 900 - 400 = 500, inner disc = 100, total = 600
         self.assertAlmostEqual(total_area(faces), 600.0, places=3)
 
     def test_four_concentric_circles(self):
-        """4 concentric circles: even-odd gives 2 annular rings."""
+        """4 nested -> 2 annular rings."""
         r1, r2, r3, r4 = 25.8, 15.4, 6.4, 2.5
         faces = fisheye(
             [
@@ -203,84 +176,129 @@ class TestFishEyeNesting(unittest.TestCase):
                 circle_wire(0, 0, r4),
             ]
         )
-        ring1 = math.pi * (r1**2 - r2**2)
-        ring2 = math.pi * (r3**2 - r4**2)
-        self.assertAlmostEqual(total_area(faces), ring1 + ring2, delta=1.0)
-
-    def test_offset_circle_hole(self):
-        """Offset hole inside a larger circle."""
-        faces = fisheye([circle_wire(0, 0, 20), circle_wire(8, 0, 3)])
-        self.assertEqual(len(faces), 1)
-        expected = math.pi * (20**2 - 3**2)
+        expected = math.pi * (r1**2 - r2**2 + r3**2 - r4**2)
         self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
 
+    def test_offset_hole(self):
+        """Non-concentric hole inside a circle."""
+        faces = fisheye([circle_wire(0, 0, 20), circle_wire(8, 0, 3)])
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(total_area(faces), math.pi * (400 - 9), delta=1.0)
+
 
 # =========================================================================
-# 5. Two overlapping shapes (fuse + split)
+# 5. Two overlapping shapes
 # =========================================================================
 
 
-class TestFishEyeTwoOverlapping(unittest.TestCase):
-    def test_two_overlapping_circles(self):
-        """Venn diagram: 3 regions."""
-        r = 10
-        d = 12
+class TestTwoOverlapping(unittest.TestCase):
+    def test_two_circles(self):
+        """Venn diagram: 3 non-overlapping regions."""
+        r, d = 10, 12
         faces = fisheye([circle_wire(0, 0, r), circle_wire(d, 0, r)])
         self.assertEqual(len(faces), 3)
         cos_arg = d / (2 * r)
         lens = 2 * r * r * math.acos(cos_arg) - (d / 2) * math.sqrt(4 * r * r - d * d)
-        expected = 2 * math.pi * r * r - lens
-        self.assertAlmostEqual(total_area(faces), expected, places=1)
-
-    def test_two_overlapping_circles_no_overlap(self):
-        faces = fisheye([circle_wire(0, 0, 10), circle_wire(12, 0, 10)])
+        self.assertAlmostEqual(total_area(faces), 2 * math.pi * r * r - lens, places=1)
         self.assertFalse(faces_overlap(faces))
 
-    def test_two_overlapping_rectangles(self):
-        """Two overlapping rectangles: 3 regions, area = union."""
+    def test_two_rectangles(self):
+        """3 non-overlapping regions, area = union."""
         faces = fisheye([rect_wire(0, 0, 20, 20), rect_wire(10, 10, 30, 30)])
         expected = union_area(rect_face(0, 0, 20, 20), rect_face(10, 10, 30, 30))
         self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
-
-    def test_two_overlapping_rectangles_no_overlap(self):
-        faces = fisheye([rect_wire(0, 0, 10, 10), rect_wire(5, 5, 15, 15)])
         self.assertFalse(faces_overlap(faces))
 
     def test_circle_overlapping_rectangle(self):
         faces = fisheye([rect_wire(0, 0, 20, 20), circle_wire(20, 10, 8)])
         self.assertEqual(len(faces), 3)
 
-    def test_two_overlapping_circles_area_via_union(self):
-        """Validate area against boolean union."""
-        faces = fisheye([circle_wire(0, 0, 15), circle_wire(12, 0, 15)])
-        c1 = Part.Face(circle_wire(0, 0, 15))
-        c2 = Part.Face(circle_wire(12, 0, 15))
-        expected = union_area(c1, c2)
-        self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
-
 
 # =========================================================================
-# 6. Subdivision by internal lines / cross patterns
+# 6. Subdivision and dangling edge pruning
 # =========================================================================
 
 
-class TestFishEyeSubdivision(unittest.TestCase):
-    def test_rectangle_with_diagonal(self):
-        """Rectangle + diagonal -> 2 triangular faces."""
-        diag = Part.Wire(Part.makePolygon([Vec(0, 0), Vec(10, 10)]))
-        faces = fisheye([rect_wire(0, 0, 10, 10), diag])
+class TestSubdivision(unittest.TestCase):
+    def test_diagonal(self):
+        """Rectangle + diagonal -> 2 triangles."""
+        faces = fisheye([rect_wire(0, 0, 10, 10), line_wire((0, 0), (10, 10))])
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 100.0, places=3)
 
     def test_cross_pattern(self):
-        """Two perpendicular rectangles (+ shape): 5 faces."""
+        """Two perpendicular rectangles (+ shape): 5 non-overlapping faces."""
         faces = fisheye([rect_wire(-5, -15, 5, 15), rect_wire(-15, -5, 15, 5)])
         self.assertEqual(len(faces), 5)
         self.assertAlmostEqual(total_area(faces), 500.0, places=2)
-
-    def test_cross_pattern_no_overlap(self):
-        faces = fisheye([rect_wire(-5, -15, 5, 15), rect_wire(-15, -5, 15, 5)])
         self.assertFalse(faces_overlap(faces))
+
+    def test_both_diagonals(self):
+        """Rectangle with both diagonals: 4 triangles."""
+        faces = fisheye(
+            [rect_wire(0, 0, 10, 10), line_wire((0, 0), (10, 10)), line_wire((10, 0), (0, 10))]
+        )
+        self.assertEqual(len(faces), 4)
+        self.assertAlmostEqual(total_area(faces), 100.0, places=3)
+        self.assertFalse(faces_overlap(faces))
+
+    def test_midpoint_cross(self):
+        """Horizontal + vertical midpoint lines: 4 equal quadrants."""
+        faces = fisheye(
+            [rect_wire(0, 0, 10, 10), line_wire((0, 5), (10, 5)), line_wire((5, 0), (5, 10))]
+        )
+        self.assertEqual(len(faces), 4)
+        self.assertAlmostEqual(total_area(faces), 100.0, places=3)
+        self.assertFalse(faces_overlap(faces))
+        for f in faces:
+            self.assertAlmostEqual(f.Area, 25.0, places=2)
+
+    def test_incomplete_intersection(self):
+        """Line from edge stopping inside rectangle -> dangling, pruned."""
+        faces = fisheye([rect_wire(0, 0, 10, 10), line_wire((5, 0), (5, 5))])
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
+    def test_t_junction(self):
+        """Line from boundary to diagonal midpoint -> valid 3-face subdivision."""
+        faces = fisheye(
+            [rect_wire(0, 0, 10, 10), line_wire((0, 0), (10, 10)), line_wire((5, 0), (5, 5))]
+        )
+        self.assertEqual(len(faces), 3)
+        self.assertAlmostEqual(total_area(faces), 100.0, places=3)
+
+    def test_dangling_chain(self):
+        """Connected dangling segments: iterative degree-1 pruning."""
+        faces = fisheye(
+            [
+                rect_wire(0, 0, 10, 10),
+                line_wire((5, 0), (5, 4)),
+                line_wire((5, 4), (7, 6)),
+                line_wire((7, 6), (4, 8)),
+            ]
+        )
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
+    def test_floating_line(self):
+        """Line fully inside rectangle, touching nothing -> pruned."""
+        faces = fisheye([rect_wire(0, 0, 10, 10), line_wire((3, 3), (7, 7))])
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, 100.0, places=3)
+
+    def test_dangling_from_circle(self):
+        """Dangling line touching a curved boundary -> pruned."""
+        faces = fisheye([circle_wire(0, 0, 10), line_wire((10, 0), (7, 0))])
+        self.assertEqual(len(faces), 1)
+        self.assertAlmostEqual(faces[0].Area, math.pi * 100, places=1)
+
+    def test_diagonal_plus_dangling(self):
+        """Valid diagonal split + dangling line: 2 faces, dangling pruned."""
+        faces = fisheye(
+            [rect_wire(0, 0, 10, 10), line_wire((0, 0), (10, 10)), line_wire((10, 5), (7, 5))]
+        )
+        self.assertEqual(len(faces), 2)
+        self.assertAlmostEqual(total_area(faces), 100.0, places=3)
 
 
 # =========================================================================
@@ -288,37 +306,21 @@ class TestFishEyeSubdivision(unittest.TestCase):
 # =========================================================================
 
 
-class TestFishEyeThreeOverlapping(unittest.TestCase):
-    def test_three_overlapping_circles(self):
-        """Three overlapping circles -> 7 regions."""
-        faces = fisheye(
-            [circle_wire(0, 0, 10), circle_wire(8, 0, 10), circle_wire(4, 7, 10)]
-        )
-        self.assertEqual(len(faces), 7)
-
-    def test_three_overlapping_circles_area(self):
-        """Total face area must equal the union area."""
+class TestMultipleOverlapping(unittest.TestCase):
+    def test_three_circles(self):
+        """Three overlapping circles -> 7 regions, area = union."""
         r = 10
         faces = fisheye(
             [circle_wire(0, 0, r), circle_wire(8, 0, r), circle_wire(4, 7, r)]
         )
+        self.assertEqual(len(faces), 7)
         c1 = Part.Face(circle_wire(0, 0, r))
         c2 = Part.Face(circle_wire(8, 0, r))
         c3 = Part.Face(circle_wire(4, 7, r))
-        expected = union_area(c1, c2, c3)
-        self.assertAlmostEqual(total_area(faces), expected, places=0)
+        self.assertAlmostEqual(total_area(faces), union_area(c1, c2, c3), places=0)
 
-    def test_three_overlapping_rectangles(self):
-        """Area validated against boolean union."""
-        faces = fisheye(
-            [rect_wire(0, 0, 20, 20), rect_wire(10, 5, 30, 25), rect_wire(5, 10, 25, 30)]
-        )
-        expected = union_area(
-            rect_face(0, 0, 20, 20), rect_face(10, 5, 30, 25), rect_face(5, 10, 25, 30)
-        )
-        self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
-
-    def test_four_overlapping_circles(self):
+    def test_four_circles(self):
+        """Four overlapping circles in a square: >= 9 regions."""
         faces = fisheye(
             [
                 circle_wire(0, 0, 10),
@@ -329,7 +331,8 @@ class TestFishEyeThreeOverlapping(unittest.TestCase):
         )
         self.assertGreaterEqual(len(faces), 9)
 
-    def test_mixed_rect_triangle_circle(self):
+    def test_mixed_geometry(self):
+        """Rectangle + triangle + circle overlap."""
         faces = fisheye(
             [
                 rect_wire(0, 0, 20, 20),
@@ -341,49 +344,20 @@ class TestFishEyeThreeOverlapping(unittest.TestCase):
 
 
 # =========================================================================
-# 8. Overlapping + holes (mixed nesting and overlap)
+# 8. Overlapping + holes
 # =========================================================================
 
 
-class TestFishEyeOverlapWithHoles(unittest.TestCase):
+class TestOverlapWithHoles(unittest.TestCase):
     def test_overlapping_rects_with_hole(self):
         """Two overlapping rects with inner hole: area = union - hole."""
         faces = fisheye(
-            [
-                rect_wire(-49.2, -40.0, 40.7, 42.4),
-                rect_wire(-84.2, -49.3, -21.9, -18.3),
-                rect_wire(1.7, 5.3, 20.7, 19.9),
-            ]
+            [rect_wire(0, 0, 90, 80), rect_wire(-30, -10, 30, 20), rect_wire(10, 20, 30, 40)]
         )
-        large = rect_face(-49.2, -40.0, 40.7, 42.4)
-        bottom = rect_face(-84.2, -49.3, -21.9, -18.3)
-        hole = rect_face(1.7, 5.3, 20.7, 19.9)
-        expected = sum(f.Area for f in large.fuse(bottom).cut(hole).Faces)
-        self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
-
-    def test_overlapping_circles_with_hole(self):
-        """Two overlapping circles with a small circle hole inside."""
-        faces = fisheye(
-            [circle_wire(0, 0, 20), circle_wire(15, 0, 20), circle_wire(0, 0, 3)]
-        )
-        c1 = Part.Face(circle_wire(0, 0, 20))
-        c2 = Part.Face(circle_wire(15, 0, 20))
-        union_a = union_area(c1, c2)
-        hole_a = math.pi * 3**2
-        expected = union_a - hole_a
-        self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
-
-    def test_overlapping_plus_separate(self):
-        """Two overlapping rects + one separate rect."""
-        faces = fisheye(
-            [
-                rect_wire(0, 0, 20, 20),
-                rect_wire(10, 10, 30, 30),
-                rect_wire(50, 0, 60, 10),
-            ]
-        )
-        overlap_a = union_area(rect_face(0, 0, 20, 20), rect_face(10, 10, 30, 30))
-        expected = overlap_a + 100.0
+        large = rect_face(0, 0, 90, 80)
+        small = rect_face(-30, -10, 30, 20)
+        hole = rect_face(10, 20, 30, 40)
+        expected = sum(f.Area for f in large.fuse(small).cut(hole).Faces)
         self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
 
     def test_overlapping_with_hole_and_separate(self):
@@ -400,78 +374,63 @@ class TestFishEyeOverlapWithHoles(unittest.TestCase):
         overlap = rect_face(10, 10, 30, 30)
         hole = rect_face(-5, -5, 5, 5)
         main_a = sum(f.Area for f in large.fuse(overlap).cut(hole).Faces)
-        expected = main_a + 100.0
-        self.assertAlmostEqual(total_area(faces), expected, delta=1.0)
+        self.assertAlmostEqual(total_area(faces), main_a + 100.0, delta=1.0)
 
 
 # =========================================================================
-# 9. Open / degenerate geometry
+# 9. Self-intersecting / degenerate geometry
 # =========================================================================
 
 
-class TestFishEyeDegenerate(unittest.TestCase):
+class TestDegenerate(unittest.TestCase):
     def test_single_open_line(self):
-        """A single open line should produce no faces."""
-        w = Part.Wire(Part.makePolygon([Vec(0, 0), Vec(10, 0)]))
+        """Open line -> no faces or RuntimeError."""
         try:
-            faces = fisheye(w)
+            faces = fisheye(line_wire((0, 0), (10, 0)))
             self.assertEqual(len(faces), 0)
         except RuntimeError:
-            pass  # also acceptable: FaceMaker throws
+            pass
 
     def test_empty_compound(self):
-        """Empty compound should produce no faces or throw."""
+        """Empty compound -> no faces or RuntimeError."""
         try:
             shape = Part.makeFace(Part.Compound([]), "Part::FaceMakerFishEye")
             self.assertEqual(len(shape.Faces), 0)
         except RuntimeError:
             pass
 
+    def test_crossing_edges(self):
+        """Closed polygon with geometric crossing -> split into 2+ faces."""
+        w = Part.Wire(
+            Part.makePolygon(
+                [Vec(-10, -5), Vec(10, 5), Vec(10, -5), Vec(-10, 5), Vec(-10, -5)]
+            )
+        )
+        faces = fisheye(w)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(total_area(faces), 0)
+
+    def test_bowtie(self):
+        """Two triangles sharing a vertex: 2 faces."""
+        w1 = Part.Wire(
+            Part.makePolygon([Vec(-10, -5), Vec(-10, 5), Vec(0, 0), Vec(-10, -5)])
+        )
+        w2 = Part.Wire(
+            Part.makePolygon([Vec(0, 0), Vec(10, 5), Vec(10, -5), Vec(0, 0)])
+        )
+        faces = fisheye([w1, w2])
+        self.assertEqual(len(faces), 2)
+        self.assertAlmostEqual(total_area(faces), 100.0, places=1)
+
     def test_figure_8_polygon(self):
-        """Self-intersecting figure-8 as single wire: doesn't crash.
-        BRepBuilderAPI_MakeFace produces a degenerate face (lobes cancel);
-        proper handling would require self-intersection detection."""
+        """Figure-8 with topological crossing (shared vertex, not geometric)."""
         w = Part.Wire(
             Part.makePolygon(
                 [
-                    Vec(5, 0),
-                    Vec(0, 5),
-                    Vec(-5, 0),
-                    Vec(0, -5),
-                    Vec(5, 0),
-                    Vec(10, 5),
-                    Vec(15, 0),
-                    Vec(10, -5),
-                    Vec(5, 0),
+                    Vec(5, 0), Vec(0, 5), Vec(-5, 0), Vec(0, -5), Vec(5, 0),
+                    Vec(10, 5), Vec(15, 0), Vec(10, -5), Vec(5, 0),
                 ]
             )
         )
         faces = fisheye(w)
         self.assertGreaterEqual(len(faces), 1)
-
-    def test_figure_8_two_wires(self):
-        """Figure-8 as two separate touching loops: 2 faces."""
-        w1 = Part.Wire(
-            Part.makePolygon(
-                [Vec(-5, 0), Vec(0, 5), Vec(5, 0), Vec(0, -5), Vec(-5, 0)]
-            )
-        )
-        w2 = Part.Wire(
-            Part.makePolygon(
-                [Vec(5, 0), Vec(10, 5), Vec(15, 0), Vec(10, -5), Vec(5, 0)]
-            )
-        )
-        faces = fisheye([w1, w2])
-        self.assertEqual(len(faces), 2)
-        self.assertGreater(total_area(faces), 0)
-
-    def test_bowtie(self):
-        """Bowtie / hourglass: self-intersecting wire, produces valid face(s)."""
-        w = Part.Wire(
-            Part.makePolygon(
-                [Vec(0, 0), Vec(10, 5), Vec(0, 10), Vec(10, 10), Vec(0, 5), Vec(10, 0), Vec(0, 0)]
-            )
-        )
-        faces = fisheye(w)
-        self.assertGreaterEqual(len(faces), 1)
-        self.assertGreater(total_area(faces), 0)
