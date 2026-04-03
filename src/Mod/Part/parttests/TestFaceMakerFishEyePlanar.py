@@ -426,21 +426,22 @@ class _Degenerate(_PlaneTestBase):
 
 class TestDegenerateInput(unittest.TestCase):
     def test_single_open_line(self):
-        try:
-            faces = Part.makeFace(
-                Part.Compound([line_wire((0, 0), (10, 0))]),
-                "Part::FaceMakerFishEye",
-            ).Faces
-            self.assertEqual(len(faces), 0)
-        except RuntimeError:
-            pass
+        """An open wire cannot form a face."""
+        self.assertRaises(
+            RuntimeError,
+            Part.makeFace,
+            Part.Compound([line_wire((0, 0), (10, 0))]),
+            "Part::FaceMakerFishEye",
+        )
 
     def test_empty_compound(self):
-        try:
-            shape = Part.makeFace(Part.Compound([]), "Part::FaceMakerFishEye")
-            self.assertEqual(len(shape.Faces), 0)
-        except RuntimeError:
-            pass
+        """An empty compound cannot form a face."""
+        self.assertRaises(
+            RuntimeError,
+            Part.makeFace,
+            Part.Compound([]),
+            "Part::FaceMakerFishEye",
+        )
 
 
 # =========================================================================
