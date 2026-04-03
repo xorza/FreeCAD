@@ -137,8 +137,7 @@ void Part::FaceMakerBuildFace::Build_Essence()
                 }
                 std::vector<Standard_Real> params;
                 for (int i = 1; i <= selfInt.NbPoints(); i++) {
-                    Geom2dAPI_ProjectPointOnCurve proj(
-                        selfInt.Point(i), curve2d, first, last);
+                    Geom2dAPI_ProjectPointOnCurve proj(selfInt.Point(i), curve2d, first, last);
                     for (int j = 1; j <= proj.NbPoints(); j++) {
                         Standard_Real p = proj.Parameter(j);
                         if (p - first > tol && last - p > tol) {
@@ -152,10 +151,13 @@ void Part::FaceMakerBuildFace::Build_Essence()
                 }
                 std::sort(params.begin(), params.end());
                 params.erase(
-                    std::unique(params.begin(),
-                                params.end(),
-                                [tol](double a, double b) { return b - a < tol; }),
-                    params.end());
+                    std::unique(
+                        params.begin(),
+                        params.end(),
+                        [tol](double a, double b) { return b - a < tol; }
+                    ),
+                    params.end()
+                );
                 Standard_Real prev = first;
                 bool didSplit = false;
                 for (Standard_Real p : params) {
@@ -181,8 +183,7 @@ void Part::FaceMakerBuildFace::Build_Essence()
             }
             catch (const Standard_Failure& e) {
                 if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
-                    FC_WARN("FaceMakerBuildFace: self-intersection split: "
-                            << e.GetMessageString());
+                    FC_WARN("FaceMakerBuildFace: self-intersection split: " << e.GetMessageString());
                 }
                 expanded.Append(edge);
             }
