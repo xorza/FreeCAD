@@ -23,6 +23,8 @@
  ***************************************************************************/
 
 #include "FaceMakerBuildFace.h"
+#include "TopoShape.h"
+#include "TopoShapeOpCode.h"
 
 #include <Bnd_Box.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
@@ -165,28 +167,6 @@ TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges,
     return result;
 }
 
-// Split edges at all mutual intersections using BRepAlgoAPI_BuilderAlgo.
-TopTools_ListOfShape splitAtIntersections(const TopTools_ListOfShape& edges)
-{
-    if (edges.Size() <= 1) {
-        return edges;
-    }
-    BRepAlgoAPI_BuilderAlgo splitter;
-    splitter.SetArguments(edges);
-    splitter.SetRunParallel(true);
-    splitter.SetNonDestructive(Standard_True);
-    splitter.Build();
-    if (!splitter.IsDone()) {
-        FC_WARN("FaceMakerBuildFace: failed to split edges at intersections");
-        return edges;
-    }
-    TopTools_ListOfShape result;
-    for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
-        result.Append(exp.Current());
-    }
-    return result;
-}
-
 }  // namespace
 
 // ─── Plane detection ────────────────────────────────────────────────────────
@@ -211,6 +191,54 @@ bool Part::FaceMakerBuildFace::findPlane(const TopTools_ListOfShape& edges,
     }
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
     return true;
+}
+
+// ─── Edge splitting ─────────────────────────────────────────────────────────
+
+TopTools_ListOfShape Part::FaceMakerBuildFace::splitAtIntersections(
+    const TopTools_ListOfShape& edges)
+{
+    if (edges.Size() <= 1) {
+        return edges;
+    }
+    mySplitter = std::make_unique<BRepAlgoAPI_BuilderAlgo>();
+    mySplitter->SetArguments(edges);
+    mySplitter->SetRunParallel(true);
+    mySplitter->SetNonDestructive(Standard_True);
+    mySplitter->Build();
+    if (!mySplitter->IsDone()) {
+        FC_WARN("FaceMakerBuildFace: failed to split edges at intersections");
+        mySplitter.reset();
+        return edges;
+    }
+    TopTools_ListOfShape result;
+    for (TopExp_Explorer exp(mySplitter->Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
+        result.Append(exp.Current());
+    }
+    return result;
+}
+
+// ─── postBuild ─────────────────────────────────────────────────────────────
+
+void Part::FaceMakerBuildFace::postBuild()
+{
+    if (!mySplitter) {
+        // No splitter (single edge, no intersections) — use base implementation
+        FaceMaker::postBuild();
+        return;
+    }
+
+    // Use MapperMaker with the BuilderAlgo's Modified/Generated history
+    // to build the element map.  This correctly traces split edge fragments
+    // back to their original source edges, producing stable mapped names
+    // like "g1;SKT;:M;BFL" instead of bare indexed names like "Edge1".
+    this->myTopoShape.Hasher = this->MyHasher;
+    MapperMaker mapper(*mySplitter);
+    this->myTopoShape.makeShapeWithElementMap(
+        this->myShape, mapper, this->mySourceShapes, Part::OpCodes::Face);
+    this->myTopoShape.initCache(true);
+    this->Done();
+    mySplitter.reset();
 }
 
 // ─── Build_Essence ──────────────────────────────────────────────────────────

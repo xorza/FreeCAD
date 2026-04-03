@@ -26,8 +26,11 @@
 
 #include "FaceMaker.h"
 
+#include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <gp_Pln.hxx>
 #include <TopTools_ListOfShape.hxx>
+
+#include <memory>
 
 #include <Mod/Part/PartGlobal.h>
 
@@ -53,12 +56,15 @@ public:
 
 protected:
     void Build_Essence() override;
+    void postBuild() override;
 
 private:
     bool findPlane(const TopTools_ListOfShape& edges, gp_Pln& plane) const;
+    TopTools_ListOfShape splitAtIntersections(const TopTools_ListOfShape& edges);
 
     gp_Pln myPlane;
     bool planeSupplied = false;
+    std::unique_ptr<BRepAlgoAPI_BuilderAlgo> mySplitter;
 };
 
 }  // namespace Part

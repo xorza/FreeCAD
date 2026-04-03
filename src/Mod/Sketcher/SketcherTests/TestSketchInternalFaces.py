@@ -558,6 +558,67 @@ class TestSketchInternalFaces(unittest.TestCase):
     # 11. Element naming
     # ==================================================================
 
+    def testSplitEdgesHaveMappedNames(self):
+        """When edges are split at intersections, the fragments must have
+        mapped names derived from the original sketch edges — not bare
+        indexed names like 'Edge1'.  This is the core of issue #29016."""
+        sk = self._make_sketch()
+        add_circle(sk, 0, 0, 10)
+        add_circle(sk, 12, 0, 10)
+        self.Doc.recompute()
+        shape = sk.InternalShape
+        self.assertFalse(shape.isNull())
+        erm = shape.ElementReverseMap
+        edge_names = {k: v for k, v in erm.items() if k.startswith("Edge")}
+        self.assertGreater(len(edge_names), 0)
+        for idx_name, mapped_name in edge_names.items():
+            self.assertNotEqual(
+                idx_name, mapped_name,
+                f"{idx_name} has no mapped name (identity mapping = unnamed)",
+            )
+            # Mapped names from sketch edges should reference geometry IDs
+            # (like "g1;SKT"), not indexed names (like "Edge1")
+            self.assertFalse(
+                str(mapped_name).startswith("Edge"),
+                f"{idx_name} -> '{mapped_name}' references an indexed name, not a mapped name",
+            )
+
+    def testSplitFaceNamesReferenceSketchEdges(self):
+        """Face combo names from split geometry should reference sketch edge
+        mapped names, not indexed names.  A name like 'Edge1;;:H:1,F' is
+        fragile; it should be something like 'g1;SKT;FAC;:H:1,F'."""
+        sk = self._make_sketch()
+        add_circle(sk, 0, 0, 10)
+        add_circle(sk, 12, 0, 10)
+        self.Doc.recompute()
+        shape = sk.InternalShape
+        self.assertFalse(shape.isNull())
+        erm = shape.ElementReverseMap
+        face_names = {k: str(v) for k, v in erm.items() if k.startswith("Face")}
+        self.assertEqual(len(face_names), 3)
+        for idx_name, mapped_name in face_names.items():
+            # Face names should NOT start with "Edge<N>;" — that indicates
+            # the face was named from an unnamed (indexed-only) edge.
+            has_indexed_ref = any(
+                mapped_name.startswith(f"Edge{i};") for i in range(1, 20)
+            )
+            self.assertFalse(
+                has_indexed_ref,
+                f"{idx_name} -> '{mapped_name}' references indexed edge name",
+            )
+
+    def testSplitEdgeNamingStableAfterRecompute(self):
+        """Split edge names for overlapping geometry must be identical
+        across recomputes."""
+        sk = self._make_sketch()
+        add_circle(sk, 0, 0, 10)
+        add_circle(sk, 12, 0, 10)
+        self.Doc.recompute()
+        names_before = sorted(sk.InternalShape.ElementReverseMap.items())
+        self.Doc.recompute()
+        names_after = sorted(sk.InternalShape.ElementReverseMap.items())
+        self.assertEqual(names_before, names_after)
+
     def testInternalShapeHasEdgeNames(self):
         """InternalShape edges should have mapped element names."""
         sk = self._make_sketch()
