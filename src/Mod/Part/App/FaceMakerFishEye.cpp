@@ -23,6 +23,7 @@
  ***************************************************************************/
 
 #include "FaceMakerFishEye.h"
+#include "FaceMakerBullseye.h"
 
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BOPAlgo_Tools.hxx>
@@ -134,8 +135,10 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
 // before the face pipeline can produce separate lobes.
 
 std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& inputWires,
-                                               const gp_Pln& plane)
+                                               const gp_Pln& plane,
+                                               bool& changed)
 {
+    changed = false;
     const Standard_Real tol = Precision::Confusion();
     std::vector<TopoDS_Wire> result;
     TopTools_ListOfShape splitEdges;
@@ -230,6 +233,7 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& i
         }
 
         if (wireSplit) {
+            changed = true;
             for (TopTools_ListIteratorOfListOfShape it(wireEdges); it.More(); it.Next()) {
                 splitEdges.Append(it.Value());
             }
@@ -287,8 +291,10 @@ struct WireFace
     double area {0.0};
 };
 
-std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires)
+std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires,
+                                      bool& changed)
 {
+    changed = false;
     int n = static_cast<int>(inputWires.size());
 
     // Build faces only from closed wires — open wires produce fake faces
@@ -334,6 +340,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             if (ca > tol && ca < wfs[i].area - tol && ca < wfs[j].area - tol) {
                 unite(parent, i, j);
                 hasOverlaps = true;
+                changed = true;
             }
         }
     }
@@ -550,20 +557,47 @@ void FaceMakerFishEye::Build_Essence()
         planar = true;
     }
 
-    // Split self-intersecting BSplines (requires plane for 2D projection)
-    std::vector<TopoDS_Wire> wires = myWires;
     if (planar) {
-        wires = splitSelfIntersecting(myWires, plane);
-        wires = fuseOverlaps(wires);
-    }
+        bool hadSplits = false;
+        bool hadFuses = false;
+        std::vector<TopoDS_Wire> wires = myWires;
+        wires = splitSelfIntersecting(myWires, plane, hadSplits);
+        wires = fuseOverlaps(wires, hadFuses);
 
-    if (planar) {
+        if (!hadSplits && !hadFuses) {
+            // Simple case: no overlaps or self-intersections.
+            // Delegate to Bullseye for TNP-stable edge structure.
+            FaceMakerBullseye bullseye;
+            if (planeSupplied) {
+                bullseye.setPlane(myPlane);
+            }
+            for (const auto& w : myWires) {
+                bullseye.addWire(w);
+            }
+            try {
+#if OCC_VERSION_HEX >= 0x070600
+                bullseye.Build(Message_ProgressRange());
+#else
+                bullseye.Build();
+#endif
+                const TopoDS_Shape& shape = bullseye.Shape();
+                if (!shape.IsNull()) {
+                    for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
+                        myShapesToReturn.push_back(exp.Current());
+                    }
+                    return;
+                }
+            }
+            catch (...) {
+            }
+        }
+
         buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
         // Non-planar: try MakeFace (analytical surfaces like cylinders),
         // then BRepFill_Filling (freeform BSpline patch).
-        for (const auto& w : wires) {
+        for (const auto& w : myWires) {
             TopoDS_Face face = makeFaceFromWire(w);
             if (face.IsNull() && BRep_Tool::IsClosed(w)) {
                 face = fillNonPlanar(w);
