@@ -26,7 +26,6 @@
 #include <sstream>
 #include <Bnd_Box.hxx>
 #include <BRepAdaptor_Curve.hxx>
-#include <BRepAdaptor_Surface.hxx>
 #include <Mod/Part/App/FCBRepAlgoAPI_Fuse.h>
 #include <Mod/Part/App/FCBRepAlgoAPI_Common.h>
 #include <BRepBndLib.hxx>
@@ -1583,61 +1582,6 @@ const std::vector<std::string>& Feature::searchElementCache(
         }
         propShape->getShape()
             .findSubShapesWithSharedVertex(it->second.shape, &it->second.names, options, tol, atol);
-        // Centroid-based fallback for faces: when vertex matching fails
-        // (e.g., sketch edit moved vertices but the face surface persists),
-        // match by surface type + area + centroid proximity.
-        if (it->second.names.empty()
-            && it->second.shape.shapeType() == TopAbs_FACE) {
-            constexpr double areaMatchRatio = 0.8;
-            constexpr double centroidFraction = 0.05;  // of bounding diagonal (linear)
-            constexpr double ambiguityRatio = 2.0;
-
-            GProp_GProps oldProps;
-            BRepGProp::SurfaceProperties(it->second.shape.getShape(), oldProps);
-            gp_Pnt oldCentroid = oldProps.CentreOfMass();
-            double oldArea = oldProps.Mass();
-            BRepAdaptor_Surface oldAdaptor(TopoDS::Face(it->second.shape.getShape()));
-            GeomAbs_SurfaceType oldSurfType = oldAdaptor.GetType();
-
-            if (oldArea > Precision::Confusion()) {
-                double bestDist = std::numeric_limits<double>::max();
-                double secondBestDist = std::numeric_limits<double>::max();
-                int bestIdx = 0;
-                int idx = 0;
-                auto currentShape = propShape->getShape();
-                for (const auto& face : currentShape.getSubTopoShapes(TopAbs_FACE)) {
-                    ++idx;
-                    BRepAdaptor_Surface adaptor(TopoDS::Face(face.getShape()));
-                    if (adaptor.GetType() != oldSurfType) {
-                        continue;
-                    }
-                    GProp_GProps props;
-                    BRepGProp::SurfaceProperties(face.getShape(), props);
-                    double area = props.Mass();
-                    if (std::min(area, oldArea) / std::max(area, oldArea) < areaMatchRatio) {
-                        continue;
-                    }
-                    double dist = oldCentroid.SquareDistance(props.CentreOfMass());
-                    if (dist < bestDist) {
-                        secondBestDist = bestDist;
-                        bestDist = dist;
-                        bestIdx = idx;
-                    }
-                    else if (dist < secondBestDist) {
-                        secondBestDist = dist;
-                    }
-                }
-                if (bestIdx > 0 && bestDist < secondBestDist / ambiguityRatio) {
-                    Bnd_Box box;
-                    BRepBndLib::Add(currentShape.getShape(), box);
-                    double diag = std::sqrt(box.SquareExtent());
-                    double threshold = diag * centroidFraction;
-                    if (std::sqrt(bestDist) <= threshold) {
-                        it->second.names.push_back("Face" + std::to_string(bestIdx));
-                    }
-                }
-            }
-        }
         if (!it->second.names.empty()) {
             it->second.searched = true;
         }
