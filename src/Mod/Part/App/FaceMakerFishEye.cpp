@@ -95,7 +95,13 @@ TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
             return mf.Face();
         }
     }
+    catch (const Standard_Failure& e) {
+        if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
+            FC_WARN("makeFaceFromWire: " << e.GetMessageString());
+        }
+    }
     catch (...) {
+        FC_WARN("makeFaceFromWire: unknown exception");
     }
     return {};
 }
@@ -412,7 +418,7 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
     }
 
     // Split edges at mutual intersections
-    TopTools_ListOfShape splitEdges;
+    TopTools_ListOfShape splitEdges = edges;
     if (edges.Size() > 1) {
         BRepAlgoAPI_BuilderAlgo splitter;
         splitter.SetArguments(edges);
@@ -420,16 +426,11 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
         splitter.SetNonDestructive(Standard_True);
         splitter.Build();
         if (splitter.IsDone()) {
+            splitEdges.Clear();
             for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
                 splitEdges.Append(exp.Current());
             }
         }
-        else {
-            splitEdges = edges;
-        }
-    }
-    else {
-        splitEdges = edges;
     }
 
     // Build base face larger than the geometry bounds
@@ -437,8 +438,11 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
     for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
         BRepBndLib::Add(it.Value(), geomBox);
     }
+    // Base face must be larger than all geometry so BuilderFace can
+    // distinguish bounded regions from the unbounded exterior.
     const Standard_Real aMax = std::max(1.0e8, 10.0 * std::sqrt(geomBox.SquareExtent()));
     TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
+    // BuilderFace requires FORWARD orientation on the base face
     baseFace.Orientation(TopAbs_FORWARD);
 
     TopTools_ListOfShape faceEdges;
@@ -524,8 +528,13 @@ TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
             return filler.Face();
         }
     }
+    catch (const Standard_Failure& e) {
+        if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
+            FC_WARN("fillNonPlanar: " << e.GetMessageString());
+        }
+    }
     catch (...) {
-        FC_WARN("BRepFill_Filling failed for non-planar wire");
+        FC_WARN("fillNonPlanar: unknown exception");
     }
     return {};
 }
