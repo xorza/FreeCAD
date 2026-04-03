@@ -49,7 +49,6 @@
 #include <GeomAPI.hxx>
 #include <Geom_Conic.hxx>
 #include <Geom_Line.hxx>
-#include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
 #include <IntTools_Context.hxx>
 #include <Precision.hxx>
@@ -397,41 +396,6 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
 // WireSplitter handles degree-4 vertices from self-intersecting curves
 // (splitting figure-8 into 2 lobes via angular sorting).
 
-// ─── Simple face building ───────────────────────────────────────────────────
-//
-// For closed wires that don't need edge splitting, build faces directly
-// using MakeFace(wire). This preserves the original wire edge order,
-// which is critical for TNP: the edge indices (Edge1, Edge2, ...) in
-// the face must match the input wire's edge order so that downstream
-// operations (Pad, Pocket) produce stable element names.
-//
-// BOPAlgo_BuilderFace reorders edges via CCW boundary walk, which
-// changes the Edge indices and breaks TNP name chains.
-
-bool buildSimple(const std::vector<TopoDS_Wire>& wires,
-                 const gp_Pln& plane,
-                 std::vector<TopoDS_Shape>& result)
-{
-    if (wires.size() != 1 || !BRep_Tool::IsClosed(wires[0])) {
-        return false;
-    }
-    // Use BRep_Builder (low-level) rather than BRepBuilderAPI_MakeFace
-    // to preserve the wire and its edges exactly as-is.  MakeFace may
-    // create copies of the wire/edges, breaking TShape identity needed
-    // for TNP tracing through mapSubElement.
-    BRep_Builder builder;
-    TopoDS_Face face;
-    builder.MakeFace(face, new Geom_Plane(plane), Precision::Confusion());
-    builder.Add(face, wires[0]);
-    if (shapeArea(face) < Precision::Confusion()) {
-        return false;
-    }
-    result.push_back(face);
-    return true;
-}
-
-// ─── Planar face building ───────────────────────────────────────────────────
-
 void buildPlanar(const std::vector<TopoDS_Wire>& wires,
                  const gp_Pln& plane,
                  std::vector<TopoDS_Shape>& result)
@@ -447,12 +411,8 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
         return;
     }
 
-    // Split edges at mutual intersections.
-    // Per-edge identity preservation: use original edges where BuilderAlgo
-    // did not split them, so that downstream mapSubElement (IsSame-based)
-    // can trace output face edges back to input sketch edges for TNP.
+    // Split edges at mutual intersections
     TopTools_ListOfShape splitEdges;
-    bool hadSplits = false;
     if (edges.Size() > 1) {
         BRepAlgoAPI_BuilderAlgo splitter;
         splitter.SetArguments(edges);
@@ -460,17 +420,8 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
         splitter.SetNonDestructive(Standard_True);
         splitter.Build();
         if (splitter.IsDone()) {
-            for (TopTools_ListIteratorOfListOfShape it(edges); it.More(); it.Next()) {
-                const TopTools_ListOfShape& mods = splitter.Modified(it.Value());
-                if (!mods.IsEmpty()) {
-                    hadSplits = true;
-                    for (TopTools_ListIteratorOfListOfShape mit(mods); mit.More(); mit.Next()) {
-                        splitEdges.Append(mit.Value());
-                    }
-                }
-                else {
-                    splitEdges.Append(it.Value());
-                }
+            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
+                splitEdges.Append(exp.Current());
             }
         }
         else {
@@ -479,12 +430,6 @@ void buildPlanar(const std::vector<TopoDS_Wire>& wires,
     }
     else {
         splitEdges = edges;
-    }
-
-    // Fast path: no edge splitting needed and all wires closed.
-    // Use MakeFace(wire) to preserve original wire edge order for TNP.
-    if (!hadSplits && buildSimple(wires, plane, result)) {
-        return;
     }
 
     // Build base face larger than the geometry bounds
