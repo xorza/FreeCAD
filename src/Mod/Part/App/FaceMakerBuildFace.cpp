@@ -84,8 +84,7 @@ namespace
 // Split self-intersecting edges (e.g., figure-8 BSplines) at their crossing
 // points.  BuilderAlgo only finds inter-edge intersections, so a single edge
 // that crosses itself must be handled here.
-TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges,
-                                           const gp_Pln& plane)
+TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges, const gp_Pln& plane)
 {
     const Standard_Real tol = Precision::Confusion();
     TopTools_ListOfShape result;
@@ -126,10 +125,13 @@ TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges,
             }
             std::sort(params.begin(), params.end());
             params.erase(
-                std::unique(params.begin(),
-                            params.end(),
-                            [tol](double a, double b) { return b - a < tol; }),
-                params.end());
+                std::unique(
+                    params.begin(),
+                    params.end(),
+                    [tol](double a, double b) { return b - a < tol; }
+                ),
+                params.end()
+            );
             Standard_Real prev = first;
             bool didSplit = false;
             for (Standard_Real p : params) {
@@ -171,8 +173,7 @@ TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges,
 
 // ─── Plane detection ────────────────────────────────────────────────────────
 
-bool Part::FaceMakerBuildFace::findPlane(const TopTools_ListOfShape& edges,
-                                         gp_Pln& plane) const
+bool Part::FaceMakerBuildFace::findPlane(const TopTools_ListOfShape& edges, gp_Pln& plane) const
 {
     if (planeSupplied) {
         plane = myPlane;
