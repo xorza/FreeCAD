@@ -72,7 +72,7 @@ void FaceMakerFishEye::setPlane(const gp_Pln& plane)
     planeSupplied = true;
 }
 
-bool FaceMakerFishEye::delegateToBullseye()
+void FaceMakerFishEye::delegateToBullseye()
 {
     FaceMakerBullseye bullseye;
     if (planeSupplied) {
@@ -81,23 +81,17 @@ bool FaceMakerFishEye::delegateToBullseye()
     for (const auto& w : myWires) {
         bullseye.addWire(w);
     }
-    try {
 #if OCC_VERSION_HEX >= 0x070600
-        bullseye.Build(Message_ProgressRange());
+    bullseye.Build(Message_ProgressRange());
 #else
-        bullseye.Build();
+    bullseye.Build();
 #endif
-        const TopoDS_Shape& shape = bullseye.Shape();
-        if (!shape.IsNull()) {
-            for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
-                myShapesToReturn.push_back(exp.Current());
-            }
-            return true;
+    const TopoDS_Shape& shape = bullseye.Shape();
+    if (!shape.IsNull()) {
+        for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
+            myShapesToReturn.push_back(exp.Current());
         }
     }
-    catch (...) {
-    }
-    return true;
 }
 
 std::string FaceMakerFishEye::getUserFriendlyName() const
@@ -593,12 +587,10 @@ void FaceMakerFishEye::Build_Essence()
         wires = fuseOverlaps(wires, hadFuses);
 
         if (!hadSplits && !hadFuses) {
-            if (delegateToBullseye()) {
-                return;
-            }
+            delegateToBullseye();
+        } else {
+            buildPlanar(wires, plane, myShapesToReturn);
         }
-
-        buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
         // Non-planar: try MakeFace (analytical surfaces like cylinders),
