@@ -644,10 +644,10 @@ class TestTopologicalNamingProblem(unittest.TestCase):
         # self.assertEqual( revolution.Shape.ElementReverseMap["Face8"].count("Face10"), 3)
 
     def testPartDesignElementMapRevolutionFuseFeatureFirst(self):
-        self._testPartDesignElementMapRevolution("FeatureFirst", "Vertex5", "Face9")
+        self._testPartDesignElementMapRevolution("FeatureFirst", "Vertex9", "Face9")
 
     def testPartDesignElementMapRevolutionWithDefaultFuseOrder(self):
-        self._testPartDesignElementMapRevolution("BaseFirst", "Vertex7", "Face8")
+        self._testPartDesignElementMapRevolution("BaseFirst", "Vertex8", "Face8")
 
     def testPartDesignBinderRevolution(self):
         doc = self.Doc
