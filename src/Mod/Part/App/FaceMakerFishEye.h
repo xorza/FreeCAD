@@ -60,8 +60,6 @@ protected:
     void Build_Essence() override;
 
 private:
-    void delegateToBullseye();
-
     gp_Pln myPlane;
     bool planeSupplied {false};
 };
