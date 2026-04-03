@@ -72,6 +72,34 @@ void FaceMakerFishEye::setPlane(const gp_Pln& plane)
     planeSupplied = true;
 }
 
+bool FaceMakerFishEye::delegateToBullseye()
+{
+    FaceMakerBullseye bullseye;
+    if (planeSupplied) {
+        bullseye.setPlane(myPlane);
+    }
+    for (const auto& w : myWires) {
+        bullseye.addWire(w);
+    }
+    try {
+#if OCC_VERSION_HEX >= 0x070600
+        bullseye.Build(Message_ProgressRange());
+#else
+        bullseye.Build();
+#endif
+        const TopoDS_Shape& shape = bullseye.Shape();
+        if (!shape.IsNull()) {
+            for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
+                myShapesToReturn.push_back(exp.Current());
+            }
+            return true;
+        }
+    }
+    catch (...) {
+    }
+    return true;
+}
+
 std::string FaceMakerFishEye::getUserFriendlyName() const
 {
     return {tr("Fish-eye facemaker").toStdString()};
@@ -565,30 +593,8 @@ void FaceMakerFishEye::Build_Essence()
         wires = fuseOverlaps(wires, hadFuses);
 
         if (!hadSplits && !hadFuses) {
-            // Simple case: no overlaps or self-intersections.
-            // Delegate to Bullseye for TNP-stable edge structure.
-            FaceMakerBullseye bullseye;
-            if (planeSupplied) {
-                bullseye.setPlane(myPlane);
-            }
-            for (const auto& w : myWires) {
-                bullseye.addWire(w);
-            }
-            try {
-#if OCC_VERSION_HEX >= 0x070600
-                bullseye.Build(Message_ProgressRange());
-#else
-                bullseye.Build();
-#endif
-                const TopoDS_Shape& shape = bullseye.Shape();
-                if (!shape.IsNull()) {
-                    for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
-                        myShapesToReturn.push_back(exp.Current());
-                    }
-                    return;
-                }
-            }
-            catch (...) {
+            if (delegateToBullseye()) {
+                return;
             }
         }
 
