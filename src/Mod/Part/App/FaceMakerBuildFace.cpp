@@ -76,8 +76,6 @@ void Part::FaceMakerBuildFace::setPlane(const gp_Pln& plane)
     planeSupplied = true;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 namespace
 {
 
@@ -171,8 +169,6 @@ TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges, co
 
 }  // namespace
 
-// ─── Plane detection ────────────────────────────────────────────────────────
-
 bool Part::FaceMakerBuildFace::findPlane(const TopTools_ListOfShape& edges, gp_Pln& plane) const
 {
     if (planeSupplied) {
@@ -193,8 +189,6 @@ bool Part::FaceMakerBuildFace::findPlane(const TopTools_ListOfShape& edges, gp_P
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
     return true;
 }
-
-// ─── Edge splitting ─────────────────────────────────────────────────────────
 
 TopTools_ListOfShape Part::FaceMakerBuildFace::splitAtIntersections(
     const TopTools_ListOfShape& edges)
@@ -219,8 +213,6 @@ TopTools_ListOfShape Part::FaceMakerBuildFace::splitAtIntersections(
     return result;
 }
 
-// ─── postBuild ─────────────────────────────────────────────────────────────
-
 void Part::FaceMakerBuildFace::postBuild()
 {
     if (!mySplitter) {
@@ -241,8 +233,6 @@ void Part::FaceMakerBuildFace::postBuild()
     this->Done();
     mySplitter.reset();
 }
-
-// ─── Build_Essence ──────────────────────────────────────────────────────────
 
 void Part::FaceMakerBuildFace::Build_Essence()
 {
