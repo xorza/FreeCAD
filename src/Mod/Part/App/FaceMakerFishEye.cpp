@@ -78,8 +78,7 @@ std::string FaceMakerFishEye::getUserFriendlyName() const
 
 std::string FaceMakerFishEye::getBriefExplanation() const
 {
-    return {tr("Unified: handles nested holes, overlapping wires, and curved surfaces")
-                .toStdString()};
+    return {tr("Unified: handles nested holes, overlapping wires, and curved surfaces").toStdString()};
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -139,8 +138,10 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
 // BSplines that cross themselves (figure-8) must be split at the crossing
 // before the face pipeline can produce separate lobes.
 
-std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& inputWires,
-                                               const gp_Pln& plane)
+std::vector<TopoDS_Wire> splitSelfIntersecting(
+    const std::vector<TopoDS_Wire>& inputWires,
+    const gp_Pln& plane
+)
 {
     const Standard_Real tol = Precision::Confusion();
     std::vector<TopoDS_Wire> result;
@@ -191,9 +192,13 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(const std::vector<TopoDS_Wire>& i
 
                 std::sort(params.begin(), params.end());
                 params.erase(
-                    std::unique(params.begin(), params.end(),
-                                [tol](double a, double b) { return b - a < tol; }),
-                    params.end());
+                    std::unique(
+                        params.begin(),
+                        params.end(),
+                        [tol](double a, double b) { return b - a < tol; }
+                    ),
+                    params.end()
+                );
 
                 // Split into sub-edges
                 Standard_Real prev = first;
@@ -402,9 +407,11 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
 // WireSplitter handles degree-4 vertices from self-intersecting curves
 // (splitting figure-8 into 2 lobes via angular sorting).
 
-void buildPlanar(const std::vector<TopoDS_Wire>& wires,
-                 const gp_Pln& plane,
-                 std::vector<TopoDS_Shape>& result)
+void buildPlanar(
+    const std::vector<TopoDS_Wire>& wires,
+    const gp_Pln& plane,
+    std::vector<TopoDS_Shape>& result
+)
 {
     // Collect all edges
     TopTools_ListOfShape edges;

@@ -24,9 +24,7 @@ Vec = FreeCAD.Vector
 
 def rect_wire(x0, y0, x1, y1):
     return Part.Wire(
-        Part.makePolygon(
-            [Vec(x0, y0), Vec(x1, y0), Vec(x1, y1), Vec(x0, y1), Vec(x0, y0)]
-        )
+        Part.makePolygon([Vec(x0, y0), Vec(x1, y0), Vec(x1, y1), Vec(x0, y1), Vec(x0, y0)])
     )
 
 
@@ -39,9 +37,7 @@ def circle_wire(cx, cy, r):
 
 
 def triangle_wire(p1, p2, p3):
-    return Part.Wire(
-        Part.makePolygon([Vec(*p1, 0), Vec(*p2, 0), Vec(*p3, 0), Vec(*p1, 0)])
-    )
+    return Part.Wire(Part.makePolygon([Vec(*p1, 0), Vec(*p2, 0), Vec(*p3, 0), Vec(*p1, 0)]))
 
 
 def line_wire(*points):
@@ -86,9 +82,7 @@ class _PlaneTestBase:
             wires = [wires]
         mat = self.placement.toMatrix()
         transformed = [Part.Wire(w.transformed(mat).Edges) for w in wires]
-        return Part.makeFace(
-            Part.Compound(transformed), "Part::FaceMakerFishEye"
-        ).Faces
+        return Part.makeFace(Part.Compound(transformed), "Part::FaceMakerFishEye").Faces
 
 
 # =========================================================================
@@ -114,9 +108,7 @@ class _SingleShape(_PlaneTestBase):
 
     def test_semicircle(self):
         r = 10
-        arc = Part.ArcOfCircle(
-            Part.Circle(Vec(0, 0, 0), Vec(0, 0, 1), r), 0, math.pi
-        )
+        arc = Part.ArcOfCircle(Part.Circle(Vec(0, 0, 0), Vec(0, 0, 1), r), 0, math.pi)
         line = Part.LineSegment(Vec(-r, 0, 0), Vec(r, 0, 0))
         w = Part.Wire([arc.toShape(), line.toShape()])
         faces = self.fisheye(w)
@@ -278,13 +270,10 @@ class _Subdivision(_PlaneTestBase):
         self.assertAlmostEqual(total_area(faces), math.pi * r * r, places=1)
 
 
-
 class _MultipleOverlapping(_PlaneTestBase):
     def test_three_circles(self):
         r = 10
-        faces = self.fisheye(
-            [circle_wire(0, 0, r), circle_wire(8, 0, r), circle_wire(4, 7, r)]
-        )
+        faces = self.fisheye([circle_wire(0, 0, r), circle_wire(8, 0, r), circle_wire(4, 7, r)])
         self.assertEqual(len(faces), 7)
         c1 = Part.Face(circle_wire(0, 0, r))
         c2 = Part.Face(circle_wire(8, 0, r))
@@ -333,21 +322,15 @@ class _OverlapWithHoles(_PlaneTestBase):
 class _Degenerate(_PlaneTestBase):
     def test_crossing_edges(self):
         w = Part.Wire(
-            Part.makePolygon(
-                [Vec(-10, -5), Vec(10, 5), Vec(10, -5), Vec(-10, 5), Vec(-10, -5)]
-            )
+            Part.makePolygon([Vec(-10, -5), Vec(10, 5), Vec(10, -5), Vec(-10, 5), Vec(-10, -5)])
         )
         faces = self.fisheye(w)
         self.assertGreaterEqual(len(faces), 2)
         self.assertGreater(total_area(faces), 0)
 
     def test_bowtie(self):
-        w1 = Part.Wire(
-            Part.makePolygon([Vec(-10, -5), Vec(-10, 5), Vec(0, 0), Vec(-10, -5)])
-        )
-        w2 = Part.Wire(
-            Part.makePolygon([Vec(0, 0), Vec(10, 5), Vec(10, -5), Vec(0, 0)])
-        )
+        w1 = Part.Wire(Part.makePolygon([Vec(-10, -5), Vec(-10, 5), Vec(0, 0), Vec(-10, -5)]))
+        w2 = Part.Wire(Part.makePolygon([Vec(0, 0), Vec(10, 5), Vec(10, -5), Vec(0, 0)]))
         faces = self.fisheye([w1, w2])
         self.assertEqual(len(faces), 2)
         self.assertAlmostEqual(total_area(faces), 100.0, places=1)
@@ -356,9 +339,14 @@ class _Degenerate(_PlaneTestBase):
         """Self-intersecting BSpline + separate non-touching line:
         BSpline should produce 2 lobes, line should be pruned."""
         poles = [
-            Vec(0, 26.06), Vec(14.6, 15.54), Vec(0.51, 0),
-            Vec(-16.13, -17.23), Vec(0, -24.02), Vec(17.15, -9.42),
-            Vec(-16.64, 15.20), Vec(0, 26.06),
+            Vec(0, 26.06),
+            Vec(14.6, 15.54),
+            Vec(0.51, 0),
+            Vec(-16.13, -17.23),
+            Vec(0, -24.02),
+            Vec(17.15, -9.42),
+            Vec(-16.64, 15.20),
+            Vec(0, 26.06),
         ]
         bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
         separate_line = line_wire((500, 500), (600, 600))
@@ -370,9 +358,14 @@ class _Degenerate(_PlaneTestBase):
         """Self-intersecting BSpline must not affect separate overlapping
         circles. The circles should still produce the correct Venn regions."""
         poles = [
-            Vec(-60, 0), Vec(-45, -15), Vec(-55, -25),
-            Vec(-65, -10), Vec(-50, 8), Vec(-60, 20),
-            Vec(-70, 10), Vec(-60, 0),
+            Vec(-60, 0),
+            Vec(-45, -15),
+            Vec(-55, -25),
+            Vec(-65, -10),
+            Vec(-50, 8),
+            Vec(-60, 20),
+            Vec(-70, 10),
+            Vec(-60, 0),
         ]
         bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
         r = 10
@@ -392,8 +385,15 @@ class _Degenerate(_PlaneTestBase):
         w = Part.Wire(
             Part.makePolygon(
                 [
-                    Vec(5, 0), Vec(0, 5), Vec(-5, 0), Vec(0, -5), Vec(5, 0),
-                    Vec(10, 5), Vec(15, 0), Vec(10, -5), Vec(5, 0),
+                    Vec(5, 0),
+                    Vec(0, 5),
+                    Vec(-5, 0),
+                    Vec(0, -5),
+                    Vec(5, 0),
+                    Vec(10, 5),
+                    Vec(15, 0),
+                    Vec(10, -5),
+                    Vec(5, 0),
                 ]
             )
         )
@@ -403,9 +403,14 @@ class _Degenerate(_PlaneTestBase):
     def test_figure_8_bspline(self):
         """Single self-intersecting BSpline forming a figure-8 -> 2 faces."""
         poles = [
-            Vec(0, 26.06), Vec(14.6, 15.54), Vec(0.51, 0),
-            Vec(-16.13, -17.23), Vec(0, -24.02), Vec(17.15, -9.42),
-            Vec(-16.64, 15.20), Vec(0, 26.06),
+            Vec(0, 26.06),
+            Vec(14.6, 15.54),
+            Vec(0.51, 0),
+            Vec(-16.13, -17.23),
+            Vec(0, -24.02),
+            Vec(17.15, -9.42),
+            Vec(-16.64, 15.20),
+            Vec(0, 26.06),
         ]
         bs = Part.BSplineCurve(poles, None, None, False, 3, [1] * len(poles), False)
         w = Part.Wire([bs.toShape()])
@@ -456,7 +461,9 @@ _MIXINS = [
 _PLANES = {
     "XY": FreeCAD.Placement(),
     "XZ": FreeCAD.Placement(Vec(0, 0, 0), FreeCAD.Rotation(Vec(1, 0, 0), 90)),
-    "Tilted": FreeCAD.Placement(Vec(10, -20, 15), FreeCAD.Rotation(Vec(1, 0, 0), 45) * FreeCAD.Rotation(Vec(0, 0, 1), 30)),
+    "Tilted": FreeCAD.Placement(
+        Vec(10, -20, 15), FreeCAD.Rotation(Vec(1, 0, 0), 45) * FreeCAD.Rotation(Vec(0, 0, 1), 30)
+    ),
 }
 
 for _plane_name, _placement in _PLANES.items():

@@ -1325,11 +1325,16 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexPartialFaceMatch)
     ASSERT_FALSE(topFace.IsNull());
 
     // Pentagon on z=1: shares (0,0), (1,0), (1,1) with box; adds (0.5,1.2)
-    auto compTS = wrapInCompound(makeFaceOnZ1({{0,0},{1,0},{1,1},{0.5,1.2},{0,1}}));
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 1}, {0.5, 1.2}, {0, 1}}));
 
     std::vector<std::string> names;
     auto found = compTS.findSubShapesWithSharedVertex(
-        topFace, &names, Data::SearchOption::CheckGeometry, 1e-7, 1e-12);
+        topFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
     EXPECT_EQ(found.size(), 1) << "Partial vertex match should find the modified face";
 }
 
@@ -1343,11 +1348,16 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexRejectsHalfMatch)
     ASSERT_FALSE(topFace.IsNull());
 
     // Shares (0,0) and (1,0) only — the rest are far away.
-    auto compTS = wrapInCompound(makeFaceOnZ1({{0,0},{1,0},{1,2},{0.5,2.5},{0,2}}));
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 2}, {0.5, 2.5}, {0, 2}}));
 
     std::vector<std::string> names;
     auto found = compTS.findSubShapesWithSharedVertex(
-        topFace, &names, Data::SearchOption::CheckGeometry, 1e-7, 1e-12);
+        topFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
     EXPECT_EQ(found.size(), 0) << "Exactly half vertex match should be rejected";
 }
 
@@ -1360,11 +1370,11 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexPartialRejectsWithou
     auto topFace = findBoxTopFace(boxMaker.Shape());
     ASSERT_FALSE(topFace.IsNull());
 
-    auto compTS = wrapInCompound(makeFaceOnZ1({{0,0},{1,0},{1,1},{0.5,1.2},{0,1}}));
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 1}, {0.5, 1.2}, {0, 1}}));
 
     std::vector<std::string> names;
-    auto found = compTS.findSubShapesWithSharedVertex(
-        topFace, &names, Data::SearchOptions(), 1e-7, 1e-12);
+    auto found
+        = compTS.findSubShapesWithSharedVertex(topFace, &names, Data::SearchOptions(), 1e-7, 1e-12);
     EXPECT_EQ(found.size(), 0) << "Partial match must require CheckGeometry";
 }
 
@@ -1377,12 +1387,17 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexMultiEntryVertex)
     TopoShape boxTS {boxMaker.Shape()};
 
     // Pentagon with non-shared vertex FIRST in the wire
-    auto pentaFace = makeFaceOnZ1({{0.5,1.2},{0,0},{1,0},{1,1},{0,1}});
+    auto pentaFace = makeFaceOnZ1({{0.5, 1.2}, {0, 0}, {1, 0}, {1, 1}, {0, 1}});
     ASSERT_FALSE(pentaFace.IsNull());
 
     std::vector<std::string> names;
     auto found = boxTS.findSubShapesWithSharedVertex(
-        pentaFace, &names, Data::SearchOption::CheckGeometry, 1e-7, 1e-12);
+        pentaFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
     EXPECT_EQ(found.size(), 1) << "Should find match via non-first entry vertex";
 }
 
@@ -1400,7 +1415,12 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexNoMatchDistantFaces)
 
     std::vector<std::string> names;
     auto found = box2TS.findSubShapesWithSharedVertex(
-        exp.Current(), &names, Data::SearchOption::CheckGeometry, 1e-7, 1e-12);
+        exp.Current(),
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
     EXPECT_EQ(found.size(), 0) << "Distant faces with no shared vertices should not match";
 }
 

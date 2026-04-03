@@ -545,11 +545,16 @@ std::vector<TopoShape> TopoShape::findSubShapesWithSharedVertex(
             // The `seen` set prevents re-checking the same shape from different
             // entry vertices, so collecting from all vertices is not redundant.
             std::unordered_set<TopoShape, ShapeHasher, ShapeHasher> seen;
-            struct Candidate { TopoShape shape; int idx; TopoShape otherWire; };
+            struct Candidate
+            {
+                TopoShape shape;
+                int idx;
+                TopoShape otherWire;
+            };
             std::vector<Candidate> candidates;
             for (const auto& entryVertex : vertices) {
-                for (auto& vert : findSubShapesWithSharedVertex(
-                         entryVertex, nullptr, options, tol, atol)) {
+                for (auto& vert :
+                     findSubShapesWithSharedVertex(entryVertex, nullptr, options, tol, atol)) {
                     for (auto idx : findAncestors(vert.getShape(), shapeType)) {
                         auto shape = getSubTopoShape(shapeType, idx);
                         if (!seen.insert(shape).second) {
@@ -599,9 +604,8 @@ std::vector<TopoShape> TopoShape::findSubShapesWithSharedVertex(
 
                 // Exact match: all vertices. Partial (different edge count):
                 // strictly more than half to avoid ambiguous 50/50 splits.
-                int required = edgeCountSame
-                    ? static_cast<int>(vertices.size())
-                    : static_cast<int>(vertices.size()) / 2 + 1;
+                int required = edgeCountSame ? static_cast<int>(vertices.size())
+                                             : static_cast<int>(vertices.size()) / 2 + 1;
                 if (matchedCount < required) {
                     continue;
                 }
@@ -641,10 +645,8 @@ std::vector<TopoShape> TopoShape::findSubShapesWithSharedVertex(
                             if (isLine2) {
                                 if (g1->isDerivedFrom<GeomLine>()
                                     || g1->isDerivedFrom<GeomLineSegment>()) {
-                                    auto p1 = BRep_Tool::Pnt(
-                                        TopExp::FirstVertex(TopoDS::Edge(e1)));
-                                    auto p2 = BRep_Tool::Pnt(
-                                        TopExp::LastVertex(TopoDS::Edge(e1)));
+                                    auto p1 = BRep_Tool::Pnt(TopExp::FirstVertex(TopoDS::Edge(e1)));
+                                    auto p2 = BRep_Tool::Pnt(TopExp::LastVertex(TopoDS::Edge(e1)));
                                     if ((p1.SquareDistance(pt1) <= tol2
                                          && p2.SquareDistance(pt2) <= tol2)
                                         || (p1.SquareDistance(pt2) <= tol2
