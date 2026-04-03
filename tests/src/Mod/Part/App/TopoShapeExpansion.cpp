@@ -1280,6 +1280,150 @@ TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexClose)
     EXPECT_EQ(names2.size(), 1);
 }
 
+// Helper: find the top face (z=1, normal along Z) of a unit box.
+static TopoDS_Face findBoxTopFace(const TopoDS_Shape& box)
+{
+    for (TopExp_Explorer exp(box, TopAbs_FACE); exp.More(); exp.Next()) {
+        BRepAdaptor_Surface a(TopoDS::Face(exp.Current()));
+        if (a.GetType() == GeomAbs_Plane && std::abs(a.Plane().Location().Z() - 1.0) < 1e-6
+            && std::abs(a.Plane().Axis().Direction().Z()) > 0.9) {
+            return TopoDS::Face(exp.Current());
+        }
+    }
+    return {};
+}
+
+// Helper: build a polygonal face on z=1 from the given XY points.
+static TopoDS_Face makeFaceOnZ1(std::initializer_list<std::pair<double, double>> pts)
+{
+    BRepBuilderAPI_MakePolygon poly;
+    for (auto [x, y] : pts) {
+        poly.Add(gp_Pnt(x, y, 1));
+    }
+    poly.Close();
+    BRepBuilderAPI_MakeFace mf(gp_Pln(gp_Pnt(0, 0, 1), gp_Dir(0, 0, 1)), poly.Wire());
+    return mf.IsDone() ? mf.Face() : TopoDS_Face();
+}
+
+// Helper: wrap a face in a compound TopoShape for searching.
+static TopoShape wrapInCompound(const TopoDS_Face& face)
+{
+    BRep_Builder bb;
+    TopoDS_Compound comp;
+    bb.MakeCompound(comp);
+    bb.Add(comp, face);
+    return TopoShape {comp};
+}
+
+TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexPartialFaceMatch)
+{
+    // 4-edge box face (4 verts) should match a 5-edge face sharing 3 of 4
+    // vertices when surface type is compatible.
+    auto boxMaker = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0);
+    boxMaker.Build();
+    auto topFace = findBoxTopFace(boxMaker.Shape());
+    ASSERT_FALSE(topFace.IsNull());
+
+    // Pentagon on z=1: shares (0,0), (1,0), (1,1) with box; adds (0.5,1.2)
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 1}, {0.5, 1.2}, {0, 1}}));
+
+    std::vector<std::string> names;
+    auto found = compTS.findSubShapesWithSharedVertex(
+        topFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
+    EXPECT_EQ(found.size(), 1) << "Partial vertex match should find the modified face";
+}
+
+TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexRejectsHalfMatch)
+{
+    // Exactly 2 of 4 vertices shared (50%) should be rejected — strictly
+    // more than half is required to avoid ambiguous matches.
+    auto boxMaker = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0);
+    boxMaker.Build();
+    auto topFace = findBoxTopFace(boxMaker.Shape());
+    ASSERT_FALSE(topFace.IsNull());
+
+    // Shares (0,0) and (1,0) only — the rest are far away.
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 2}, {0.5, 2.5}, {0, 2}}));
+
+    std::vector<std::string> names;
+    auto found = compTS.findSubShapesWithSharedVertex(
+        topFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
+    EXPECT_EQ(found.size(), 0) << "Exactly half vertex match should be rejected";
+}
+
+TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexPartialRejectsWithoutGeometry)
+{
+    // Partial match (different edge count) must be rejected when
+    // CheckGeometry is not set — can't confirm surface compatibility.
+    auto boxMaker = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0);
+    boxMaker.Build();
+    auto topFace = findBoxTopFace(boxMaker.Shape());
+    ASSERT_FALSE(topFace.IsNull());
+
+    auto compTS = wrapInCompound(makeFaceOnZ1({{0, 0}, {1, 0}, {1, 1}, {0.5, 1.2}, {0, 1}}));
+
+    std::vector<std::string> names;
+    auto found
+        = compTS.findSubShapesWithSharedVertex(topFace, &names, Data::SearchOptions(), 1e-7, 1e-12);
+    EXPECT_EQ(found.size(), 0) << "Partial match must require CheckGeometry";
+}
+
+TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexMultiEntryVertex)
+{
+    // First vertex of the target doesn't exist in the search shape, but
+    // later vertices do.  The multi-vertex entry loop should find the match.
+    auto boxMaker = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0);
+    boxMaker.Build();
+    TopoShape boxTS {boxMaker.Shape()};
+
+    // Pentagon with non-shared vertex FIRST in the wire
+    auto pentaFace = makeFaceOnZ1({{0.5, 1.2}, {0, 0}, {1, 0}, {1, 1}, {0, 1}});
+    ASSERT_FALSE(pentaFace.IsNull());
+
+    std::vector<std::string> names;
+    auto found = boxTS.findSubShapesWithSharedVertex(
+        pentaFace,
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
+    EXPECT_EQ(found.size(), 1) << "Should find match via non-first entry vertex";
+}
+
+TEST_F(TopoShapeExpansionTest, findSubShapesWithSharedVertexNoMatchDistantFaces)
+{
+    // Faces with zero shared vertices should never match, even with
+    // compatible surface types.
+    auto boxMaker1 = BRepPrimAPI_MakeBox(1.0, 1.0, 1.0);
+    boxMaker1.Build();
+    auto boxMaker2 = BRepPrimAPI_MakeBox(gp_Pnt(10, 10, 10), 1.0, 1.0, 1.0);
+    boxMaker2.Build();
+
+    TopExp_Explorer exp(boxMaker1.Shape(), TopAbs_FACE);
+    TopoShape box2TS {boxMaker2.Shape()};
+
+    std::vector<std::string> names;
+    auto found = box2TS.findSubShapesWithSharedVertex(
+        exp.Current(),
+        &names,
+        Data::SearchOption::CheckGeometry,
+        1e-7,
+        1e-12
+    );
+    EXPECT_EQ(found.size(), 0) << "Distant faces with no shared vertices should not match";
+}
+
 TEST_F(TopoShapeExpansionTest, makeElementShellInvalid)
 {
     // Arrange

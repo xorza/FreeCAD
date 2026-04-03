@@ -230,5 +230,5 @@ App::DocumentObjectExecReturn* Revolution::execute()
 void Part::Revolution::setupObject()
 {
     Part::Feature::setupObject();
-    this->FaceMakerClass.setValue("Part::FaceMakerBullseye");  // default for newly created features
+    this->FaceMakerClass.setValue("Part::FaceMakerFishEye");  // default for newly created features
 }

@@ -130,7 +130,7 @@ protected:
      * whole Build().
      */
     virtual void Build_Essence() = 0;
-    void postBuild();
+    virtual void postBuild();
 
     static void throwNotImplemented();
 };
