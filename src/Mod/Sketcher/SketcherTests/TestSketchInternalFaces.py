@@ -505,6 +505,56 @@ class TestSketchInternalFaces(unittest.TestCase):
         self.assertGreaterEqual(len(faces), 9, "Four overlapping circles should produce >= 9 faces")
 
     # ==================================================================
+    # 10. Self-intersecting BSplines
+    # ==================================================================
+
+    def testFigure8BSpline(self):
+        """A single self-intersecting BSpline forming a figure-8 -> 2 faces."""
+        sk = self._make_sketch()
+        pts = [
+            App.Vector(0, 0, 0),
+            App.Vector(5, 5, 0),
+            App.Vector(10, 0, 0),
+            App.Vector(5, -5, 0),
+            App.Vector(0, 0, 0),
+            App.Vector(-5, -5, 0),
+            App.Vector(-10, 0, 0),
+            App.Vector(-5, 5, 0),
+            App.Vector(0, 0, 0),
+        ]
+        bs = Part.BSplineCurve()
+        bs.interpolate(pts)
+        sk.addGeometry(bs)
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 2, "Figure-8 BSpline should produce 2 faces")
+        for f in faces:
+            self.assertGreater(f.Area, 1.0)
+
+    def testBSplineWithSeparateLine(self):
+        """Self-intersecting BSpline + separate non-touching line:
+        the line should be pruned (dangling), BSpline produces 2 faces."""
+        sk = self._make_sketch()
+        pts = [
+            App.Vector(0, 0, 0),
+            App.Vector(5, 5, 0),
+            App.Vector(10, 0, 0),
+            App.Vector(5, -5, 0),
+            App.Vector(0, 0, 0),
+            App.Vector(-5, -5, 0),
+            App.Vector(-10, 0, 0),
+            App.Vector(-5, 5, 0),
+            App.Vector(0, 0, 0),
+        ]
+        bs = Part.BSplineCurve()
+        bs.interpolate(pts)
+        sk.addGeometry(bs)
+        sk.addGeometry(Part.LineSegment(App.Vector(50, 0, 0), App.Vector(60, 0, 0)))
+        self.Doc.recompute()
+        faces = get_internal_faces(sk)
+        self.assertEqual(len(faces), 2)
+
+    # ==================================================================
     # 11. Element naming
     # ==================================================================
 

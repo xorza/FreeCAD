@@ -27,16 +27,28 @@
 #include <Bnd_Box.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <BRepAlgoAPI_BuilderAlgo.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepGProp.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
+#include <Geom2dAPI_InterCurveCurve.hxx>
+#include <Geom2dAPI_ProjectPointOnCurve.hxx>
+#include <Geom_Conic.hxx>
+#include <Geom_Line.hxx>
 #include <GeomAdaptor_Surface.hxx>
-#include <TopExp.hxx>
+#include <GeomAPI.hxx>
+#include <GProp_GProps.hxx>
+#include <Precision.hxx>
 #include <TopExp_Explorer.hxx>
-#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopoDS.hxx>
+
+#include <algorithm>
+#include <cmath>
 
 #include <Base/Console.h>
 
@@ -75,6 +87,113 @@ void Part::FaceMakerBuildFace::Build_Essence()
         return;
     }
 
+    // Step 1b: Detect the plane early — needed for self-intersection
+    // splitting (2D projection) and later for BuilderFace.
+    // Copy edges to strip cached surface info that can mislead FindSurface.
+    BRep_Builder builder;
+    gp_Pln plane;
+    bool planeFound = planeSupplied;
+    if (planeSupplied) {
+        plane = myPlane;
+    }
+    else {
+        TopoDS_Compound copyComp;
+        builder.MakeCompound(copyComp);
+        for (TopTools_ListIteratorOfListOfShape it(edgeList); it.More(); it.Next()) {
+            builder.Add(copyComp, BRepBuilderAPI_Copy(it.Value()).Shape());
+        }
+        BRepLib_FindSurface planeFinder(copyComp, -1, Standard_True);
+        if (planeFinder.Found()) {
+            plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
+            planeFound = true;
+        }
+    }
+
+    // Step 1c: Split self-intersecting edges (e.g., figure-8 BSplines).
+    // BuilderAlgo only finds inter-edge intersections, so a single BSpline
+    // that crosses itself must be split here first.
+    if (planeFound) {
+        const Standard_Real tol = Precision::Confusion();
+        TopTools_ListOfShape expanded;
+        for (TopTools_ListIteratorOfListOfShape it(edgeList); it.More(); it.Next()) {
+            const TopoDS_Edge& edge = TopoDS::Edge(it.Value());
+            try {
+                Standard_Real first {}, last {};
+                Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, first, last);
+                if (curve.IsNull() || curve->IsKind(STANDARD_TYPE(Geom_Line))
+                    || curve->IsKind(STANDARD_TYPE(Geom_Conic))) {
+                    expanded.Append(edge);
+                    continue;
+                }
+                Handle(Geom2d_Curve) curve2d = GeomAPI::To2d(curve, plane);
+                if (curve2d.IsNull()) {
+                    expanded.Append(edge);
+                    continue;
+                }
+                Geom2dAPI_InterCurveCurve selfInt(curve2d, tol);
+                if (selfInt.NbPoints() == 0) {
+                    expanded.Append(edge);
+                    continue;
+                }
+                std::vector<Standard_Real> params;
+                for (int i = 1; i <= selfInt.NbPoints(); i++) {
+                    Geom2dAPI_ProjectPointOnCurve proj(
+                        selfInt.Point(i), curve2d, first, last);
+                    for (int j = 1; j <= proj.NbPoints(); j++) {
+                        Standard_Real p = proj.Parameter(j);
+                        if (p - first > tol && last - p > tol) {
+                            params.push_back(p);
+                        }
+                    }
+                }
+                if (params.empty()) {
+                    expanded.Append(edge);
+                    continue;
+                }
+                std::sort(params.begin(), params.end());
+                params.erase(
+                    std::unique(params.begin(),
+                                params.end(),
+                                [tol](double a, double b) { return b - a < tol; }),
+                    params.end());
+                Standard_Real prev = first;
+                bool didSplit = false;
+                for (Standard_Real p : params) {
+                    if (p - prev > tol) {
+                        BRepBuilderAPI_MakeEdge me(curve, prev, p);
+                        if (me.IsDone()) {
+                            expanded.Append(me.Edge());
+                            didSplit = true;
+                        }
+                        prev = p;
+                    }
+                }
+                if (last - prev > tol) {
+                    BRepBuilderAPI_MakeEdge me(curve, prev, last);
+                    if (me.IsDone()) {
+                        expanded.Append(me.Edge());
+                        didSplit = true;
+                    }
+                }
+                if (!didSplit) {
+                    expanded.Append(edge);
+                }
+            }
+            catch (const Standard_Failure& e) {
+                if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
+                    FC_WARN("FaceMakerBuildFace: self-intersection split: "
+                            << e.GetMessageString());
+                }
+                expanded.Append(edge);
+            }
+            catch (...) {
+                FC_WARN("FaceMakerBuildFace: self-intersection split: unknown exception");
+                expanded.Append(edge);
+            }
+        }
+        edgeList = expanded;
+    }
+
     // Step 2: Split edges at all mutual intersections
     TopTools_ListOfShape splitEdges;
     if (edgeList.Size() > 1) {
@@ -95,67 +214,19 @@ void Part::FaceMakerBuildFace::Build_Essence()
         splitEdges = edgeList;
     }
 
-    // Step 2b: Remove dangling edges — edges where a vertex has degree 1.
-    // Open wires that don't fully cross a region (incomplete intersections)
-    // leave free endpoints that would create artifact faces in BuilderFace.
-    // Prune iteratively to handle chains of dangling segments.
-    BRep_Builder builder;
-    TopoDS_Compound edgeCompound;
-    {
-        bool changed = true;
-        while (changed) {
-            changed = false;
-            builder.MakeCompound(edgeCompound);
-            for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-                builder.Add(edgeCompound, it.Value());
-            }
-            TopTools_IndexedDataMapOfShapeListOfShape vertexEdgeMap;
-            TopExp::MapShapesAndAncestors(edgeCompound, TopAbs_VERTEX, TopAbs_EDGE, vertexEdgeMap);
-
-            TopTools_ListOfShape filtered;
-            for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
-                const TopoDS_Edge& e = TopoDS::Edge(it.Value());
-                TopoDS_Vertex v1, v2;
-                TopExp::Vertices(e, v1, v2);
-                bool dangling = false;
-                if (!v1.IsNull() && vertexEdgeMap.Contains(v1)
-                    && vertexEdgeMap.FindFromKey(v1).Size() == 1) {
-                    dangling = true;
-                }
-                if (!v2.IsNull() && !v1.IsSame(v2) && vertexEdgeMap.Contains(v2)
-                    && vertexEdgeMap.FindFromKey(v2).Size() == 1) {
-                    dangling = true;
-                }
-                if (!dangling) {
-                    filtered.Append(e);
-                }
-                else {
-                    changed = true;
-                }
-            }
-            splitEdges = filtered;
-        }
-        if (splitEdges.IsEmpty()) {
-            return;
-        }
+    // Step 3: Verify we have a plane (detected in Step 1b)
+    if (!planeFound) {
+        FC_WARN("FaceMakerBuildFace: edges are not coplanar");
+        return;
     }
 
-    // Step 3: Determine the plane (reuses edgeCompound from Step 2b)
-    gp_Pln plane;
-    if (planeSupplied) {
-        plane = myPlane;
+    // Step 4: Build base face larger than all geometry so BuilderFace
+    // can distinguish bounded regions from the unbounded exterior.
+    Bnd_Box geomBox;
+    for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
+        BRepBndLib::Add(it.Value(), geomBox);
     }
-    else {
-        BRepLib_FindSurface planeFinder(edgeCompound, -1, Standard_True);
-        if (!planeFinder.Found()) {
-            FC_WARN("FaceMakerBuildFace: edges are not coplanar");
-            return;
-        }
-        plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
-    }
-
-    // Step 4: Build a large planar base face
-    const Standard_Real aMax = 1.0e8;
+    const Standard_Real aMax = std::max(1.0e8, 10.0 * std::sqrt(geomBox.SquareExtent()));
     TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
     baseFace.Orientation(TopAbs_FORWARD);
 
@@ -168,10 +239,13 @@ void Part::FaceMakerBuildFace::Build_Essence()
     }
     BRepLib::BuildPCurveForEdgesOnPlane(edgesForFace, baseFace);
 
-    // Step 6: Run BOPAlgo_BuilderFace to find all bounded face regions
+    // Step 6: Run BOPAlgo_BuilderFace to find all bounded face regions.
+    // SetAvoidInternalShapes prevents dangling edges from becoming
+    // internal wires that create degenerate geometry when extruded.
     BOPAlgo_BuilderFace faceBuilder;
     faceBuilder.SetFace(baseFace);
     faceBuilder.SetShapes(edgesForFace);
+    faceBuilder.SetAvoidInternalShapes(Standard_True);
     faceBuilder.Perform();
     if (faceBuilder.HasErrors()) {
         FC_WARN("FaceMakerBuildFace: BOPAlgo_BuilderFace failed");
@@ -179,12 +253,18 @@ void Part::FaceMakerBuildFace::Build_Essence()
     }
 
     // Step 7: Collect result faces, excluding the unbounded outer face
+    // and degenerate (zero-area) faces.
     const double outerExtentThreshold = aMax * aMax;
     const TopTools_ListOfShape& builtFaces = faceBuilder.Areas();
     for (TopTools_ListIteratorOfListOfShape it(builtFaces); it.More(); it.Next()) {
         Bnd_Box box;
         BRepBndLib::Add(it.Value(), box);
         if (box.SquareExtent() > outerExtentThreshold) {
+            continue;
+        }
+        GProp_GProps props;
+        BRepGProp::SurfaceProperties(it.Value(), props);
+        if (props.Mass() < Precision::Confusion()) {
             continue;
         }
         myShapesToReturn.push_back(it.Value());
