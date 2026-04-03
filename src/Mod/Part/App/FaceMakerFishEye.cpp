@@ -552,12 +552,29 @@ void FaceMakerFishEye::Build_Essence()
 
     // Split self-intersecting BSplines (requires plane for 2D projection)
     std::vector<TopoDS_Wire> wires = myWires;
+    bool modified = false;
     if (planar) {
         wires = splitSelfIntersecting(myWires, plane);
+        if (wires.size() != myWires.size()) {
+            modified = true;
+        }
+        wires = fuseOverlaps(wires);
+        if (wires.size() != myWires.size()) {
+            modified = true;
+        }
     }
 
     if (planar) {
-        wires = fuseOverlaps(wires);
+        if (!modified && wires.size() == 1) {
+            // Simple case: single wire, no overlaps or self-intersections.
+            // Use MakeFace like Bullseye for TNP-stable edge structure.
+            TopoDS_Face face = makeFaceFromWire(wires.front());
+            if (!face.IsNull()) {
+                myShapesToReturn.push_back(face);
+                return;
+            }
+            // MakeFace failed (e.g. self-intersecting wire) — fall through
+        }
         buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
