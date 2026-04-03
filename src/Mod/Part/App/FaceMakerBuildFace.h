@@ -27,6 +27,7 @@
 #include "FaceMaker.h"
 
 #include <gp_Pln.hxx>
+#include <TopTools_ListOfShape.hxx>
 
 #include <Mod/Part/PartGlobal.h>
 
@@ -54,6 +55,8 @@ protected:
     void Build_Essence() override;
 
 private:
+    bool findPlane(const TopTools_ListOfShape& edges, gp_Pln& plane) const;
+
     gp_Pln myPlane;
     bool planeSupplied = false;
 };
