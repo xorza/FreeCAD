@@ -307,7 +307,7 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                         }
                     }
                     if (!shape.isNull()) {
-                        shape = shape.makeElementFace();
+                        shape = shape.makeElementFace(nullptr, "Part::FaceMakerFishEye");
                     }
                 }
             }
