@@ -108,7 +108,10 @@ double shapeArea(const TopoDS_Shape& s)
 
 // ─── Plane detection ────────────────────────────────────────────────────────
 
-bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
+// findPlane is defined outside the anonymous namespace as a member of FaceMakerFishEye.
+}  // namespace
+
+bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane) const
 {
     // Copy wires to strip embedded surface info — BRepLib_FindSurface
     // can return the edge's cached surface (e.g. sketch XY plane) instead
@@ -124,8 +127,19 @@ bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane)
         return false;
     }
     plane = GeomAdaptor_Surface(planeFinder.Surface()).Plane();
+
+    // BRepLib_FindSurface returns an arbitrary normal direction that can
+    // differ across platforms. If a reference plane was supplied (e.g. from
+    // the sketch's Placement), align the normal with it.
+    if (planeSupplied
+        && plane.Axis().Direction().Dot(myPlane.Axis().Direction()) < 0) {
+        plane = gp_Pln(plane.Location(), plane.Axis().Direction().Reversed());
+    }
     return true;
 }
+
+namespace
+{
 
 // ─── Self-intersection splitting ────────────────────────────────────────────
 //
@@ -550,8 +564,8 @@ void FaceMakerFishEye::Build_Essence()
         return;
     }
 
-    // Always detect the plane from geometry — the supplied plane (from
-    // setPlane) may not match the actual edge coordinates. PartDesign
+    // Detect the plane from actual edge geometry. The supplied plane (from
+    // setPlane) may not match the actual edge coordinates — PartDesign
     // transforms edges to global space but may supply the sketch-local plane.
     gp_Pln plane;
     bool planar = findPlane(myWires, plane);

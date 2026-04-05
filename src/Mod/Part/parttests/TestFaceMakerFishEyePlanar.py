@@ -88,6 +88,7 @@ class _PlaneTestBase:
 
 # =========================================================================
 # Test mixins (no unittest.TestCase — concrete classes generated below)
+# pylint: disable=no-member
 # =========================================================================
 
 

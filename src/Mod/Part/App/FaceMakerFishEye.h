@@ -27,6 +27,7 @@
 #include "FaceMaker.h"
 
 #include <gp_Pln.hxx>
+#include <TopoDS_Wire.hxx>
 
 #include <Mod/Part/PartGlobal.h>
 
@@ -62,6 +63,8 @@ protected:
 private:
     gp_Pln myPlane;
     bool planeSupplied {false};
+
+    bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane) const;
 };
 
 }  // namespace Part
