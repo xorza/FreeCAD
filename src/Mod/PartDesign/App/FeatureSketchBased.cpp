@@ -310,8 +310,7 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                         gp_Pln sketchPlane;
                         const gp_Pln* plnPtr = nullptr;
                         if (obj->isDerivedFrom<Part::Part2DObject>()) {
-                            Base::Placement SketchPlm =
-                                getVerifiedSketch()->Placement.getValue();
+                            Base::Placement SketchPlm = getVerifiedSketch()->Placement.getValue();
                             Base::Vector3d SketchNormal(0, 0, 1);
                             SketchPlm.getRotation().multVec(SketchNormal, SketchNormal);
                             Base::Vector3d SketchPos = SketchPlm.getPosition();
