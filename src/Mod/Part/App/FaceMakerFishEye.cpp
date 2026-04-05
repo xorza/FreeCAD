@@ -91,7 +91,8 @@ TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w, const gp_Pln* plane = nullptr
     if (!BRep_Tool::IsClosed(w)) {
         return {};
     }
-    BRepBuilderAPI_MakeFace mf = plane ? BRepBuilderAPI_MakeFace(*plane, w) : BRepBuilderAPI_MakeFace(w);
+    BRepBuilderAPI_MakeFace mf = plane ? BRepBuilderAPI_MakeFace(*plane, w)
+                                       : BRepBuilderAPI_MakeFace(w);
     if (mf.IsDone()) {
         return mf.Face();
     }
