@@ -86,9 +86,9 @@ std::string FaceMakerFishEye::getBriefExplanation() const
 namespace
 {
 
-TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
+TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w, const gp_Pln* plane = nullptr)
 {
-    BRepBuilderAPI_MakeFace mf(w);
+    BRepBuilderAPI_MakeFace mf = plane ? BRepBuilderAPI_MakeFace(*plane, w) : BRepBuilderAPI_MakeFace(w);
     if (mf.IsDone()) {
         return mf.Face();
     }
@@ -288,7 +288,7 @@ struct WireFace
     double area {0.0};
 };
 
-std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires)
+std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane)
 {
     int n = static_cast<int>(inputWires.size());
 
@@ -300,7 +300,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
         WireFace wf;
         wf.wire = w;
         if (BRep_Tool::IsClosed(w)) {
-            wf.face = makeFaceFromWire(w);
+            wf.face = makeFaceFromWire(w, &plane);
             if (!wf.face.IsNull()) {
                 BRepBndLib::AddOptimal(w, wf.box, Standard_False);
                 wf.area = shapeArea(wf.face);
@@ -487,7 +487,7 @@ void buildPlanar(
     std::vector<TopoDS_Face> wireFaces;
     wireFaces.reserve(wires.size());
     for (const auto& w : wires) {
-        wireFaces.push_back(BRep_Tool::IsClosed(w) ? makeFaceFromWire(w) : TopoDS_Face());
+        wireFaces.push_back(BRep_Tool::IsClosed(w) ? makeFaceFromWire(w, &plane) : TopoDS_Face());
     }
 
     for (const auto& face : allFaces) {
@@ -558,7 +558,7 @@ void FaceMakerFishEye::Build_Essence()
 
     if (planar) {
         std::vector<TopoDS_Wire> wires = splitSelfIntersecting(myWires, plane);
-        wires = fuseOverlaps(wires);
+        wires = fuseOverlaps(wires, plane);
         buildPlanar(wires, plane, myShapesToReturn);
     }
     else {
