@@ -307,7 +307,21 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                         }
                     }
                     if (!shape.isNull()) {
-                        shape = shape.makeElementFace(nullptr, "Part::FaceMakerFishEye");
+                        gp_Pln sketchPlane;
+                        const gp_Pln* plnPtr = nullptr;
+                        if (obj->isDerivedFrom<Part::Part2DObject>()) {
+                            auto placement = static_cast<const Part::Part2DObject*>(obj)->Placement.getValue();
+                            auto pos = placement.getPosition();
+                            Base::Rotation rot = placement.getRotation();
+                            Base::Vector3d normal;
+                            rot.multVec(Base::Vector3d(0, 0, 1), normal);
+                            sketchPlane = gp_Pln(
+                                gp_Pnt(pos.x, pos.y, pos.z),
+                                gp_Dir(normal.x, normal.y, normal.z)
+                            );
+                            plnPtr = &sketchPlane;
+                        }
+                        shape = shape.makeElementFace(nullptr, "Part::FaceMakerFishEye", plnPtr);
                     }
                 }
             }
