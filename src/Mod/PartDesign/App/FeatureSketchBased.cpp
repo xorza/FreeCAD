@@ -310,7 +310,8 @@ TopoShape ProfileBased::getTopoShapeVerifiedFace(
                         gp_Pln sketchPlane;
                         const gp_Pln* plnPtr = nullptr;
                         if (obj->isDerivedFrom<Part::Part2DObject>()) {
-                            auto placement = static_cast<const Part::Part2DObject*>(obj)->Placement.getValue();
+                            auto placement
+                                = static_cast<const Part::Part2DObject*>(obj)->Placement.getValue();
                             auto pos = placement.getPosition();
                             Base::Rotation rot = placement.getRotation();
                             Base::Vector3d normal;
