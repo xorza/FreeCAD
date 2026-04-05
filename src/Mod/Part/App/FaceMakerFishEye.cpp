@@ -88,19 +88,9 @@ namespace
 
 TopoDS_Face makeFaceFromWire(const TopoDS_Wire& w)
 {
-    try {
-        BRepBuilderAPI_MakeFace mf(w);
-        if (mf.IsDone()) {
-            return mf.Face();
-        }
-    }
-    catch (const Standard_Failure& e) {
-        if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
-            FC_WARN("makeFaceFromWire: " << e.GetMessageString());
-        }
-    }
-    catch (...) {
-        FC_WARN("makeFaceFromWire: unknown exception");
+    BRepBuilderAPI_MakeFace mf(w);
+    if (mf.IsDone()) {
+        return mf.Face();
     }
     return {};
 }
