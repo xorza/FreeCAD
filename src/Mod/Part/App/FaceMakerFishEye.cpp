@@ -131,8 +131,7 @@ bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& 
     // BRepLib_FindSurface returns an arbitrary normal direction that can
     // differ across platforms. If a reference plane was supplied (e.g. from
     // the sketch's Placement), align the normal with it.
-    if (planeSupplied
-        && plane.Axis().Direction().Dot(myPlane.Axis().Direction()) < 0) {
+    if (planeSupplied && plane.Axis().Direction().Dot(myPlane.Axis().Direction()) < 0) {
         plane = gp_Pln(plane.Location(), plane.Axis().Direction().Reversed());
     }
     return true;
