@@ -31,6 +31,7 @@
 
 #include <QCursor>
 #include <QImage>
+#include <QLabel>
 
 #include <Inventor/SbRotation.h>
 #include <Inventor/nodes/SoEnvironment.h>
@@ -65,6 +66,7 @@ class QSurfaceFormat;
 class SoTranslation;
 class SoTransform;
 class SoText2;
+class SoAnnotation;
 
 class SoSeparator;
 class SoShapeHints;
@@ -556,6 +558,7 @@ private:
 
 private:
     NaviCube* naviCube;
+    SoAnnotation* naviCubeAnnotation;
     std::set<ViewProvider*> _ViewProviderSet;
     std::map<SoSeparator*, ViewProvider*> _ViewProviderMap;
     std::list<GLGraphicsItem*> graphicsItems;
@@ -603,6 +606,8 @@ private:
 
     // stuff needed to draw the fps counter
     bool fpsEnabled;
+    QLabel* fpsCounter = nullptr;
+    unsigned long previousAxisLetterColor = 0;
     bool vboEnabled;
     bool naviCubeEnabled;
 

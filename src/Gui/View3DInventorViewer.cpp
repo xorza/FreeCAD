@@ -509,6 +509,10 @@ void View3DInventorViewer::init()
     this->foregroundroot->ref();
     this->foregroundroot->setName("foregroundroot");
 
+    naviCubeAnnotation = new SoAnnotation();
+    naviCubeAnnotation->ref();
+    naviCubeAnnotation->setName("naviCubeAnnotation");
+
     auto lm = new SoLightModel;
     lm->model = SoLightModel::BASE_COLOR;
 
@@ -530,6 +534,7 @@ void View3DInventorViewer::init()
     this->foregroundroot->addChild(cam);
     this->foregroundroot->addChild(lm);
     this->foregroundroot->addChild(bc);
+    this->foregroundroot->addChild(naviCubeAnnotation);
 
     auto threePointLightingSeparator = new SoTransformSeparator;
     threePointLightingSeparator->addChild(lightRotation);
@@ -692,6 +697,12 @@ void View3DInventorViewer::init()
     );
 
     naviCube = new NaviCube(this);
+    if (auto node = naviCube->getCoinNode()) {
+        if (naviCubeAnnotation) {
+            naviCubeAnnotation->removeAllChildren();
+            naviCubeAnnotation->addChild(node);
+        }
+    }
     naviCubeEnabled = true;
 
     updateColors();
@@ -712,6 +723,15 @@ View3DInventorViewer::~View3DInventorViewer()
     }
 
     // cleanup
+    if (naviCubeAnnotation) {
+        naviCubeAnnotation->removeAllChildren();
+        if (this->foregroundroot) {
+            this->foregroundroot->removeChild(naviCubeAnnotation);
+        }
+        naviCubeAnnotation->unref();
+        naviCubeAnnotation = nullptr;
+    }
+
     this->backgroundroot->unref();
     this->backgroundroot = nullptr;
     this->foregroundroot->unref();
@@ -789,6 +809,9 @@ void View3DInventorViewer::aboutToDestroyGLContext()
     if (naviCube) {
         if (auto gl = qobject_cast<QOpenGLWidget*>(this->viewport())) {
             gl->makeCurrent();
+        }
+        if (naviCubeAnnotation) {
+            naviCubeAnnotation->removeAllChildren();
         }
         delete naviCube;
         naviCube = nullptr;
@@ -1401,7 +1424,18 @@ void View3DInventorViewer::setGradientBackgroundColor(
 void View3DInventorViewer::setEnabledFPSCounter(bool on)
 {
     fpsEnabled = on;
+    if (on) {
+        if (!fpsCounter) {
+            fpsCounter = new QLabel(this);
+            fpsCounter->setAttribute(Qt::WA_TransparentForMouseEvents);
+        }
+        fpsCounter->show();
+    }
+    else if (fpsCounter) {
+        fpsCounter->hide();
+    }
 }
+
 
 void View3DInventorViewer::setEnabledVBO(bool on)
 {
@@ -2449,10 +2483,6 @@ void View3DInventorViewer::renderFramebuffer()
         it->paintGL();
     }
 
-    if (naviCubeEnabled) {
-        naviCube->drawNaviCube();
-    }
-
     glPopAttrib();
 }
 
@@ -2480,10 +2510,6 @@ void View3DInventorViewer::renderGLImage()
 
     for (auto it : this->graphicsItems) {
         it->paintGL();
-    }
-
-    if (naviCubeEnabled) {
-        naviCube->drawNaviCube();
     }
 
     glPopAttrib();
@@ -2611,31 +2637,35 @@ void View3DInventorViewer::renderScene()
         }
     }
 
-    // fps rendering
-    if (fpsEnabled) {
+    if (fpsEnabled && fpsCounter) {
         std::stringstream stream;
         stream.precision(1);
         stream.setf(std::ios::fixed | std::ios::showpoint);
         stream << framesPerSecond[0] << " ms / " << framesPerSecond[1] << " fps";
-        ParameterGrp::handle hGrpOverlayL = App::GetApplication().GetParameterGroupByPath(
-            "User parameter:BaseApp/MainWindow/DockWindows/OverlayLeft"
-        );
-        std::string overlayLeftWidgets = hGrpOverlayL->GetASCII("Widgets", "");
+
         ParameterGrp::handle hGrpView = App::GetApplication().GetParameterGroupByPath(
             "User parameter:BaseApp/Preferences/View"
         );
-        unsigned long axisLetterColor
-            = hGrpView->GetUnsigned("AxisLetterColor", 4294902015);  // default FPS color (yellow)
-        draw2DString(
-            stream.str().c_str(),
-            SbVec2s(10, 10),
-            SbVec2f((overlayLeftWidgets.empty() ? 0.1f : 1.1f), 0.1f),
-            Base::Color(static_cast<uint32_t>(axisLetterColor))
-        );  // NOLINT
-    }
+        unsigned long axisLetterColor = hGrpView->GetUnsigned("AxisLetterColor", 4294902015);
+        if (axisLetterColor != previousAxisLetterColor) {
+            previousAxisLetterColor = axisLetterColor;
+            Base::Color c(static_cast<uint32_t>(axisLetterColor));
+            fpsCounter->setStyleSheet(
+                QString::fromLatin1("color: rgb(%1,%2,%3); background: transparent;")
+                    .arg(int(c.r * 255))
+                    .arg(int(c.g * 255))
+                    .arg(int(c.b * 255))
+            );
+        }
 
-    if (naviCubeEnabled) {
-        naviCube->drawNaviCube();
+        fpsCounter->setText(QString::fromStdString(stream.str()));
+        fpsCounter->adjustSize();
+
+        ParameterGrp::handle hGrpOverlayL = App::GetApplication().GetParameterGroupByPath(
+            "User parameter:BaseApp/MainWindow/DockWindows/OverlayLeft"
+        );
+        int xOffset = hGrpOverlayL->GetASCII("Widgets", "").empty() ? 10 : fpsCounter->width() + 20;
+        fpsCounter->move(xOffset, height() - fpsCounter->height() - 5);
     }
 
     // Workaround for inconsistent QT behavior related to handling custom OpenGL widgets that
