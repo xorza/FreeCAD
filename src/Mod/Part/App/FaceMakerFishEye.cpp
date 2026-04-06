@@ -241,10 +241,6 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
                 }
                 wireEdges.Append(edge);
             }
-            catch (...) {
-                FC_WARN("splitSelfIntersecting: unknown exception");
-                wireEdges.Append(edge);
-            }
         }
 
         if (wireSplit) {
@@ -546,9 +542,6 @@ TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
         if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
             FC_WARN("fillNonPlanar: " << e.GetMessageString());
         }
-    }
-    catch (...) {
-        FC_WARN("fillNonPlanar: unknown exception");
     }
     return {};
 }
