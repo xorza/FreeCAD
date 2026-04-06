@@ -81,8 +81,6 @@ std::string FaceMakerFishEye::getBriefExplanation() const
     return {tr("Unified: handles nested holes, overlapping wires, and curved surfaces").toStdString()};
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 namespace
 {
 
@@ -106,9 +104,6 @@ double shapeArea(const TopoDS_Shape& s)
     return props.Mass();
 }
 
-// ─── Plane detection ────────────────────────────────────────────────────────
-
-// findPlane is defined outside the anonymous namespace as a member of FaceMakerFishEye.
 }  // namespace
 
 bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane) const
@@ -140,8 +135,6 @@ bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& 
 namespace
 {
 
-// ─── Self-intersection splitting ────────────────────────────────────────────
-//
 // BSplines that cross themselves (figure-8) must be split at the crossing
 // before the face pipeline can produce separate lobes.
 
@@ -163,6 +156,7 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
             try {
                 Standard_Real first, last;
                 Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, first, last);
+                // Lines and conics (circles, ellipses, etc.) cannot self-intersect.
                 if (curve.IsNull() || curve->IsKind(STANDARD_TYPE(Geom_Line))
                     || curve->IsKind(STANDARD_TYPE(Geom_Conic))) {
                     wireEdges.Append(edge);
@@ -273,8 +267,6 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
     return result;
 }
 
-// ─── Overlap fusing ─────────────────────────────────────────────────────────
-//
 // Partially overlapping closed wires are fused into their union so that
 // even-odd classification can treat each Venn region independently.
 // Full containment (hole inside outer) is preserved for even-odd nesting.
@@ -305,7 +297,6 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
 {
     int n = static_cast<int>(inputWires.size());
 
-    // Build faces only from closed wires — open wires produce fake faces
     std::vector<WireFace> wfs;
     wfs.reserve(n);
     int closedCount = 0;
@@ -345,6 +336,8 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             }
             double ca = shapeArea(common.Shape());
             double tol = Precision::Confusion();
+            // Partial overlap: intersection area is nonzero but smaller than
+            // either face. Full containment (hole-in-outer) is excluded.
             if (ca > tol && ca < wfs[i].area - tol && ca < wfs[j].area - tol) {
                 unite(parent, i, j);
                 hasOverlaps = true;
@@ -400,15 +393,9 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
     return result;
 }
 
-// ─── Planar face building ───────────────────────────────────────────────────
-//
 // Pipeline: BRepAlgoAPI_BuilderAlgo (split edges at intersections)
-//         → BOPAlgo_BuilderFace (find all bounded regions via WireSplitter)
+//         → BOPAlgo_BuilderFace (find all bounded regions)
 //         → even-odd classification (nesting/holes)
-//
-// Uses BuilderFace directly instead of EdgesToWires + WiresToFaces.
-// WireSplitter handles degree-4 vertices from self-intersecting curves
-// (splitting figure-8 into 2 lobes via angular sorting).
 
 void buildPlanar(
     const std::vector<TopoDS_Wire>& wires,
@@ -443,18 +430,19 @@ void buildPlanar(
         }
     }
 
-    // Build base face larger than the geometry bounds
     Bnd_Box geomBox;
     for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
         BRepBndLib::Add(it.Value(), geomBox);
     }
     // Base face must be larger than all geometry so BuilderFace can
     // distinguish bounded regions from the unbounded exterior.
+    // BuilderFace also requires FORWARD orientation on the base face.
     const Standard_Real aMax = std::max(1.0e8, 10.0 * std::sqrt(geomBox.SquareExtent()));
     TopoDS_Face baseFace = BRepBuilderAPI_MakeFace(plane, -aMax, aMax, -aMax, aMax).Face();
-    // BuilderFace requires FORWARD orientation on the base face
     baseFace.Orientation(TopAbs_FORWARD);
 
+    // BuilderFace needs both orientations of each edge to form closed wires,
+    // and 2D parametric curves (pcurves) projected onto the base face.
     TopTools_ListOfShape faceEdges;
     for (TopTools_ListIteratorOfListOfShape it(splitEdges); it.More(); it.Next()) {
         const TopoDS_Edge& e = TopoDS::Edge(it.Value());
@@ -463,7 +451,6 @@ void buildPlanar(
     }
     BRepLib::BuildPCurveForEdgesOnPlane(faceEdges, baseFace);
 
-    // BOPAlgo_BuilderFace: finds all bounded face regions.
     // SetAvoidInternalShapes prevents dangling edges from becoming
     // internal wires that create degenerate geometry when extruded.
     BOPAlgo_BuilderFace faceBuilder;
@@ -524,8 +511,6 @@ void buildPlanar(
     }
 }
 
-// ─── Non-planar fallback ────────────────────────────────────────────────────
-
 TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
 {
     try {
@@ -547,8 +532,6 @@ TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
 }
 
 }  // namespace
-
-// ─── Build_Essence ──────────────────────────────────────────────────────────
 
 void FaceMakerFishEye::Build_Essence()
 {
