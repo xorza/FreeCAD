@@ -287,9 +287,9 @@ void unite(std::vector<int>& parent, int a, int b)
 
 struct WireFace
 {
-    TopoDS_Wire wire;
-    TopoDS_Face face;
-    Bnd_Box box;
+    TopoDS_Wire wire {};
+    TopoDS_Face face {};
+    Bnd_Box box {};
     double area {0.0};
 };
 
@@ -321,6 +321,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
     std::vector<int> parent(n);
     std::iota(parent.begin(), parent.end(), 0);
     bool hasOverlaps = false;
+    const double tol = Precision::Confusion();
 
     for (int i = 0; i < n; ++i) {
         if (wfs[i].face.IsNull()) {
@@ -334,8 +335,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             if (!common.IsDone() || common.Shape().IsNull()) {
                 continue;
             }
-            double ca = shapeArea(common.Shape());
-            double tol = Precision::Confusion();
+            const double ca = shapeArea(common.Shape());
             // Partial overlap: intersection area is nonzero but smaller than
             // either face. Full containment (hole-in-outer) is excluded.
             if (ca > tol && ca < wfs[i].area - tol && ca < wfs[j].area - tol) {
