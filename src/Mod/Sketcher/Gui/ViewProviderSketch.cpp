@@ -3534,8 +3534,10 @@ bool ViewProviderSketch::getElementPicked(const SoPickedPoint* pp, std::string& 
     return ViewProvider2DObject::getElementPicked(pp, subname);
 }
 
-std::vector<std::pair<std::string, std::string>>
-ViewProviderSketch::getRelatedElements(const std::string& subname, const SbVec3f& pickPoint) const
+std::vector<std::pair<std::string, std::string>> ViewProviderSketch::getRelatedElements(
+    const std::string& subname,
+    const SbVec3f& pickPoint
+) const
 {
     std::vector<std::pair<std::string, std::string>> result;
 
@@ -3582,8 +3584,7 @@ ViewProviderSketch::getRelatedElements(const std::string& subname, const SbVec3f
         int faceIdx = faceMap.FindIndex(it.Value());
         if (faceIdx > 0) {
             std::string idx = std::to_string(faceIdx);
-            result.push_back({"Face" + idx,
-                              SketchObject::internalPrefix() + "Face" + idx});
+            result.push_back({"Face" + idx, SketchObject::internalPrefix() + "Face" + idx});
         }
     }
 

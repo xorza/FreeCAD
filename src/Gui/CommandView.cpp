@@ -4427,13 +4427,15 @@ void StdCmdClarifySelection::activated(int iMsg)
         }
         for (const auto& [relElement, relSubName] :
              subVP->getRelatedElements(pickedElement, pp->getPoint())) {
-            selections.push_back(PickData {
-                .obj = obj,
-                .element = relElement,
-                .docName = obj->getDocument()->getName(),
-                .objName = obj->getNameInDocument(),
-                .subName = subObjPath + relSubName
-            });
+            selections.push_back(
+                PickData {
+                    .obj = obj,
+                    .element = relElement,
+                    .docName = obj->getDocument()->getName(),
+                    .objName = obj->getNameInDocument(),
+                    .subName = subObjPath + relSubName
+                }
+            );
         }
     }
 

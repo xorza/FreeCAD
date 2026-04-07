@@ -1019,8 +1019,8 @@ bool ViewProvider::getElementPicked(const SoPickedPoint* pp, std::string& subnam
     return true;
 }
 
-std::vector<std::pair<std::string, std::string>>
-ViewProvider::getRelatedElements(const std::string& /*subname*/, const SbVec3f& /*pickPoint*/) const
+std::vector<std::pair<std::string, std::string>> ViewProvider::
+    getRelatedElements(const std::string& /*subname*/, const SbVec3f& /*pickPoint*/) const
 {
     return {};
 }
