@@ -4429,24 +4429,13 @@ void StdCmdClarifySelection::activated(int iMsg)
                 }
             }
         }
-        for (const auto& relName : relVP->getRelatedElements(relElementName)) {
-            // Extract the element type for menu categorization.
-            // The relName may include a prefix (e.g. "InternalFace1"); find the
-            // standard element name within it for proper grouping under "Face".
-            std::string element = relName;
-            for (const char* type : {"Face", "Edge", "Vertex"}) {
-                auto pos = relName.find(type);
-                if (pos != std::string::npos && pos > 0) {
-                    element = relName.substr(pos);
-                    break;
-                }
-            }
+        for (const auto& [element, subName] : relVP->getRelatedElements(relElementName)) {
             selections.push_back(PickData {
                 .obj = obj,
                 .element = element,
                 .docName = obj->getDocument()->getName(),
                 .objName = obj->getNameInDocument(),
-                .subName = subObjPath + relName
+                .subName = subObjPath + subName
             });
         }
     }

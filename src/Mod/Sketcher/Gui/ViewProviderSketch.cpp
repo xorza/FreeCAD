@@ -3531,9 +3531,10 @@ bool ViewProviderSketch::getElementPicked(const SoPickedPoint* pp, std::string& 
     return ViewProvider2DObject::getElementPicked(pp, subname);
 }
 
-std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::string& subname) const
+std::vector<std::pair<std::string, std::string>>
+ViewProviderSketch::getRelatedElements(const std::string& subname) const
 {
-    std::vector<std::string> result;
+    std::vector<std::pair<std::string, std::string>> result;
 
     const auto& internalShape = getSketchObject()->InternalShape.getShape();
     if (internalShape.isNull()) {
@@ -3548,7 +3549,7 @@ std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::strin
         internalEdgeName = stripped;
     }
     else {
-        // Reverse lookup: "Edge3" -> "InternalEdge3" -> "Edge3" (in InternalShape)
+        // Reverse lookup: e.g. "Edge3" -> "InternalEdge1" -> "Edge1" (in InternalShape)
         auto& elementMap = getSketchObject()->getInternalElementMap();
         auto it = elementMap.find(subname);
         if (it == elementMap.end()) {
@@ -3587,7 +3588,9 @@ std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::strin
     for (TopTools_ListIteratorOfListOfShape it(faces); it.More(); it.Next()) {
         int faceIdx = faceMap.FindIndex(it.Value());
         if (faceIdx > 0) {
-            result.push_back(SketchObject::internalPrefix() + "Face" + std::to_string(faceIdx));
+            std::string idx = std::to_string(faceIdx);
+            result.push_back({"Face" + idx,
+                              SketchObject::internalPrefix() + "Face" + idx});
         }
     }
 
