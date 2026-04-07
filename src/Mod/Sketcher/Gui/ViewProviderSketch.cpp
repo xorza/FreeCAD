@@ -85,6 +85,11 @@
 #include "ViewProviderSketchGeometryExtension.h"
 #include "Workbench.h"
 
+#include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
+
 #include <Mod/Part/Gui/SoFCShapeObject.h>
 
 
@@ -3524,6 +3529,77 @@ bool ViewProviderSketch::getElementPicked(const SoPickedPoint* pp, std::string& 
     }
 
     return ViewProvider2DObject::getElementPicked(pp, subname);
+}
+
+std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::string& subname) const
+{
+    std::vector<std::string> result;
+
+    const auto& internalShape = getSketchObject()->InternalShape.getShape();
+    if (internalShape.isNull()) {
+        return result;
+    }
+
+    // Strip sub-object prefix (e.g. "Sketch.InternalFace10" -> "InternalFace10")
+    std::string elementName = subname;
+    auto dotPos = elementName.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        elementName = elementName.substr(dotPos + 1);
+    }
+
+    // Resolve the element name to its InternalShape form.
+    // Input can be "InternalFace1" (direct) or "Edge3" (mapped from "InternalEdge3").
+    std::string internalElementName;
+    const char* stripped = SketchObject::convertInternalName(elementName.c_str());
+    if (stripped) {
+        internalElementName = stripped;
+    }
+    else {
+        // Try reverse lookup: "Edge3" -> "InternalEdge3"
+        auto& elementMap = getSketchObject()->getInternalElementMap();
+        auto it = elementMap.find(elementName);
+        if (it == elementMap.end()) {
+            return result;
+        }
+        stripped = SketchObject::convertInternalName(it->second.c_str());
+        if (!stripped) {
+            return result;
+        }
+        internalElementName = stripped;
+    }
+
+    // Only augment edge picks with adjacent faces.
+    // Face picks are already correct -- no need to add neighbors.
+    if (!boost::starts_with(internalElementName, "Edge")) {
+        return result;
+    }
+
+    TopoDS_Shape edge = internalShape.getSubShape(internalElementName.c_str(), true);
+    if (edge.IsNull()) {
+        return result;
+    }
+
+    const TopoDS_Shape& shape = internalShape.getShape();
+
+    TopTools_IndexedDataMapOfShapeListOfShape edgeToFaces;
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeToFaces);
+
+    TopTools_IndexedMapOfShape faceMap;
+    TopExp::MapShapes(shape, TopAbs_FACE, faceMap);
+
+    int edgeIdx = edgeToFaces.FindIndex(edge);
+    if (edgeIdx == 0) {
+        return result;
+    }
+    const TopTools_ListOfShape& faces = edgeToFaces.FindFromIndex(edgeIdx);
+    for (TopTools_ListIteratorOfListOfShape it(faces); it.More(); it.Next()) {
+        int faceIdx = faceMap.FindIndex(it.Value());
+        if (faceIdx > 0) {
+            result.push_back(SketchObject::internalPrefix() + "Face" + std::to_string(faceIdx));
+        }
+    }
+
+    return result;
 }
 
 bool ViewProviderSketch::getDetailPath(

@@ -278,6 +278,8 @@ public:
     {}
     /// return a hit element given the picked point which contains the full node path
     virtual bool getElementPicked(const SoPickedPoint*, std::string& subname) const;
+    /// return additional element names related to a picked element (e.g. adjacent faces for an edge)
+    virtual std::vector<std::string> getRelatedElements(const std::string& subname) const;
     /// return a hit element to the selection path or 0
     virtual std::string getElement(const SoDetail*) const
     {
