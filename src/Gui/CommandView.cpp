@@ -4413,29 +4413,26 @@ void StdCmdClarifySelection::activated(int iMsg)
         selections.push_back(pickData);
 
         // Resolve sub-object view provider for virtual dispatch (e.g. Body -> Sketch)
-        ViewProvider* relVP = vp;
         std::string subObjPath;
-        std::string relElementName = pickData.subName;
+        std::string pickedElement = pickData.subName;
         auto lastDot = pickData.subName.find_last_of('.');
         if (lastDot != std::string::npos) {
             subObjPath = pickData.subName.substr(0, lastDot + 1);
-            relElementName = pickData.subName.substr(lastDot + 1);
-            auto* subObj = obj->getSubObject(subObjPath.c_str());
-            if (subObj) {
-                auto* subVP = Application::Instance->getViewProvider(subObj);
-                if (subVP) {
-                    relVP = subVP;
-                }
-            }
+            pickedElement = pickData.subName.substr(lastDot + 1);
         }
-        for (const auto& [element, subName] :
-             relVP->getRelatedElements(relElementName, pp->getPoint())) {
+        auto* subObj = obj->getSubObject(subObjPath.c_str());
+        auto* subVP = subObj ? Application::Instance->getViewProvider(subObj) : nullptr;
+        if (!subVP) {
+            subVP = vp;
+        }
+        for (const auto& [relElement, relSubName] :
+             subVP->getRelatedElements(pickedElement, pp->getPoint())) {
             selections.push_back(PickData {
                 .obj = obj,
-                .element = element,
+                .element = relElement,
                 .docName = obj->getDocument()->getName(),
                 .objName = obj->getNameInDocument(),
-                .subName = subObjPath + subName
+                .subName = subObjPath + relSubName
             });
         }
     }
