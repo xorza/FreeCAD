@@ -4412,8 +4412,7 @@ void StdCmdClarifySelection::activated(int iMsg)
 
         selections.push_back(pickData);
 
-        // Ask the view provider for related elements (e.g. adjacent faces for an edge).
-        // Resolve the sub-object VP (e.g. Body -> Sketch) for proper virtual dispatch.
+        // Resolve sub-object view provider for virtual dispatch (e.g. Body -> Sketch)
         ViewProvider* relVP = vp;
         std::string subObjPath;
         std::string relElementName = pickData.subName;

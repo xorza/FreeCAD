@@ -3539,7 +3539,6 @@ ViewProviderSketch::getRelatedElements(const std::string& subname, const SbVec3f
 {
     std::vector<std::pair<std::string, std::string>> result;
 
-    // Only handle edges
     if (!boost::starts_with(subname, "Edge") && !boost::starts_with(subname, "InternalEdge")) {
         return result;
     }
