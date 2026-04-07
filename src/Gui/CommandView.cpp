@@ -4412,41 +4412,41 @@ void StdCmdClarifySelection::activated(int iMsg)
 
         selections.push_back(pickData);
 
-        // Ask the view provider for related elements (e.g. adjacent faces for an edge)
-        // Resolve the sub-object VP (e.g. Body -> Sketch) for proper virtual dispatch
+        // Ask the view provider for related elements (e.g. adjacent faces for an edge).
+        // Resolve the sub-object VP (e.g. Body -> Sketch) for proper virtual dispatch.
         ViewProvider* relVP = vp;
         std::string subObjPath;
         std::string relElementName = pickData.subName;
-        {
-            // Split "Sketch.InternalFace10" into subObjPath="Sketch." and element="InternalFace10"
-            auto lastDot = pickData.subName.find_last_of('.');
-            if (lastDot != std::string::npos) {
-                subObjPath = pickData.subName.substr(0, lastDot + 1);
-                relElementName = pickData.subName.substr(lastDot + 1);
-                auto* subObj = obj->getSubObject(subObjPath.c_str());
-                if (subObj) {
-                    auto* subVP = Application::Instance->getViewProvider(subObj);
-                    if (subVP) {
-                        relVP = subVP;
-                    }
+        auto lastDot = pickData.subName.find_last_of('.');
+        if (lastDot != std::string::npos) {
+            subObjPath = pickData.subName.substr(0, lastDot + 1);
+            relElementName = pickData.subName.substr(lastDot + 1);
+            auto* subObj = obj->getSubObject(subObjPath.c_str());
+            if (subObj) {
+                auto* subVP = Application::Instance->getViewProvider(subObj);
+                if (subVP) {
+                    relVP = subVP;
                 }
             }
         }
         for (const auto& relName : relVP->getRelatedElements(relElementName)) {
-            // Reconstruct full subName with the sub-object path prefix
-            std::string fullSubName = subObjPath + relName;
-            // Use the base element name for categorization (e.g. "Face1")
-            std::string relElement = relName;
-            auto pos = relElement.find("Face");
-            if (pos != std::string::npos && pos > 0) {
-                relElement = relElement.substr(pos);
+            // Extract the element type for menu categorization.
+            // The relName may include a prefix (e.g. "InternalFace1"); find the
+            // standard element name within it for proper grouping under "Face".
+            std::string element = relName;
+            for (const char* type : {"Face", "Edge", "Vertex"}) {
+                auto pos = relName.find(type);
+                if (pos != std::string::npos && pos > 0) {
+                    element = relName.substr(pos);
+                    break;
+                }
             }
             selections.push_back(PickData {
                 .obj = obj,
-                .element = relElement,
+                .element = element,
                 .docName = obj->getDocument()->getName(),
                 .objName = obj->getNameInDocument(),
-                .subName = fullSubName
+                .subName = subObjPath + relName
             });
         }
     }

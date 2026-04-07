@@ -3540,24 +3540,17 @@ std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::strin
         return result;
     }
 
-    // Strip sub-object prefix (e.g. "Sketch.InternalFace10" -> "InternalFace10")
-    std::string elementName = subname;
-    auto dotPos = elementName.find_last_of('.');
-    if (dotPos != std::string::npos) {
-        elementName = elementName.substr(dotPos + 1);
-    }
-
     // Resolve the element name to its InternalShape form.
-    // Input can be "InternalFace1" (direct) or "Edge3" (mapped from "InternalEdge3").
-    std::string internalElementName;
-    const char* stripped = SketchObject::convertInternalName(elementName.c_str());
+    // Input can be "InternalEdge5" (direct) or "Edge3" (mapped from "InternalEdge3").
+    std::string internalEdgeName;
+    const char* stripped = SketchObject::convertInternalName(subname.c_str());
     if (stripped) {
-        internalElementName = stripped;
+        internalEdgeName = stripped;
     }
     else {
-        // Try reverse lookup: "Edge3" -> "InternalEdge3"
+        // Reverse lookup: "Edge3" -> "InternalEdge3" -> "Edge3" (in InternalShape)
         auto& elementMap = getSketchObject()->getInternalElementMap();
-        auto it = elementMap.find(elementName);
+        auto it = elementMap.find(subname);
         if (it == elementMap.end()) {
             return result;
         }
@@ -3565,16 +3558,15 @@ std::vector<std::string> ViewProviderSketch::getRelatedElements(const std::strin
         if (!stripped) {
             return result;
         }
-        internalElementName = stripped;
+        internalEdgeName = stripped;
     }
 
-    // Only augment edge picks with adjacent faces.
-    // Face picks are already correct -- no need to add neighbors.
-    if (!boost::starts_with(internalElementName, "Edge")) {
+    // Only augment edge picks with adjacent faces
+    if (!boost::starts_with(internalEdgeName, "Edge")) {
         return result;
     }
 
-    TopoDS_Shape edge = internalShape.getSubShape(internalElementName.c_str(), true);
+    TopoDS_Shape edge = internalShape.getSubShape(internalEdgeName.c_str(), true);
     if (edge.IsNull()) {
         return result;
     }
