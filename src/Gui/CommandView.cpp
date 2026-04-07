@@ -4429,7 +4429,8 @@ void StdCmdClarifySelection::activated(int iMsg)
                 }
             }
         }
-        for (const auto& [element, subName] : relVP->getRelatedElements(relElementName)) {
+        for (const auto& [element, subName] :
+             relVP->getRelatedElements(relElementName, pp->getPoint())) {
             selections.push_back(PickData {
                 .obj = obj,
                 .element = element,

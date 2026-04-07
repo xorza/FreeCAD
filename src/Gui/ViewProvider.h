@@ -282,9 +282,10 @@ public:
      * Each returned pair contains (element, subName) where element is the bare
      * name for display/categorization (e.g. "Face1") and subName is the full
      * sub-element reference for selection (e.g. "InternalFace1").
+     * @param pickPoint 3D pick location, used to filter results by proximity
      */
     virtual std::vector<std::pair<std::string, std::string>>
-    getRelatedElements(const std::string& subname) const;
+    getRelatedElements(const std::string& subname, const SbVec3f& pickPoint) const;
     /// return a hit element to the selection path or 0
     virtual std::string getElement(const SoDetail*) const
     {
