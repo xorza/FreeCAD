@@ -510,6 +510,10 @@ SoSketchFaces::SoSketchFaces(){
     shapeHints->shapeType = SoShapeHints::UNKNOWN_SHAPE_TYPE;
     shapeHints->vertexOrdering = SoShapeHints::COUNTERCLOCKWISE;
 
+    auto* pickStyle = new SoPickStyle;
+    pickStyle->style = SoPickStyle::SHAPE_ON_TOP;
+
+    SoSeparator::addChild(pickStyle);
     SoSeparator::addChild(material);
     SoSeparator::addChild(shapeHints);
     SoSeparator::addChild(coords);
