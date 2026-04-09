@@ -319,25 +319,27 @@ class ShapeString(DraftObject):
         # FaceMakerSimple:
         #     All fonts: overlapping faces in case of nested wires f.e. with: O.
         try:
-            # print("try Bullseye")
-            faces = Part.makeFace(wirelist, "Part::FaceMakerBullseye").Faces
+            faces = Part.makeFace(wirelist, "Part::FaceMakerFishEye").Faces
             for face in faces:
                 face.validate()
         except Part.OCCError:
             try:
-                # print("try Cheese")
-                faces = Part.makeFace(wirelist, "Part::FaceMakerCheese").Faces
+                faces = Part.makeFace(wirelist, "Part::FaceMakerBullseye").Faces
                 for face in faces:
                     face.validate()
             except Part.OCCError:
                 try:
-                    # print("try Simple")
-                    faces = Part.makeFace(wirelist, "Part::FaceMakerSimple").Faces
+                    faces = Part.makeFace(wirelist, "Part::FaceMakerCheese").Faces
                     for face in faces:
                         face.validate()
                 except Part.OCCError:
-                    App.Console.PrintWarning(wrn)
-                    return []
+                    try:
+                        faces = Part.makeFace(wirelist, "Part::FaceMakerSimple").Faces
+                        for face in faces:
+                            face.validate()
+                    except Part.OCCError:
+                        App.Console.PrintWarning(wrn)
+                        return []
 
         for face in faces:
             try:

@@ -9,6 +9,7 @@ tilted plane automatically.
 """
 
 import math
+import os
 import unittest
 
 import FreeCAD
@@ -87,6 +88,7 @@ class _PlaneTestBase:
 
 # =========================================================================
 # Test mixins (no unittest.TestCase — concrete classes generated below)
+# pylint: disable=no-member
 # =========================================================================
 
 
@@ -426,26 +428,86 @@ class _Degenerate(_PlaneTestBase):
 
 class TestDegenerateInput(unittest.TestCase):
     def test_single_open_line(self):
-        try:
-            faces = Part.makeFace(
-                Part.Compound([line_wire((0, 0), (10, 0))]),
-                "Part::FaceMakerFishEye",
-            ).Faces
-            self.assertEqual(len(faces), 0)
-        except RuntimeError:
-            pass
+        """An open wire cannot form a face."""
+        self.assertRaises(
+            RuntimeError,
+            Part.makeFace,
+            Part.Compound([line_wire((0, 0), (10, 0))]),
+            "Part::FaceMakerFishEye",
+        )
 
     def test_empty_compound(self):
-        try:
-            shape = Part.makeFace(Part.Compound([]), "Part::FaceMakerFishEye")
-            self.assertEqual(len(shape.Faces), 0)
-        except RuntimeError:
-            pass
+        """An empty compound cannot form a face."""
+        self.assertRaises(
+            RuntimeError,
+            Part.makeFace,
+            Part.Compound([]),
+            "Part::FaceMakerFishEye",
+        )
 
 
 # =========================================================================
-# Plane definitions and class generation
+# Text glyph tests — uses the font bundled with FreeCAD (osifont)
 # =========================================================================
+
+_FONT_PATH = os.path.join(FreeCAD.getResourceDir(), "Mod", "TechDraw", "Resources", "fonts")
+_FONT_FILE = "osifont-lgpl3fe.ttf"
+_FONT_AVAILABLE = os.path.isfile(os.path.join(_FONT_PATH, _FONT_FILE))
+
+
+class TestTextGlyphs(unittest.TestCase):
+    """FishEye face making for actual font glyph wires."""
+
+    def setUp(self):
+        if not _FONT_AVAILABLE:
+            self.skipTest("Bundled osifont not found")
+
+    def _glyph_faces(self, char):
+        wires = Part.makeWireString(char, _FONT_PATH + "/", _FONT_FILE, 10.0, 0.0)
+        self.assertEqual(len(wires), 1, f"Expected 1 character, got {len(wires)}")
+        comp = Part.Compound(wires[0])
+        return Part.makeFace(comp, "Part::FaceMakerFishEye").Faces
+
+    def test_letter_A(self):
+        """Letter A has an outer outline and a triangular hole — 1 face."""
+        faces = self._glyph_faces("A")
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_letter_B(self):
+        """Letter B has an outer outline and two holes — 1 face."""
+        faces = self._glyph_faces("B")
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_letter_O(self):
+        """Letter O has an outer and inner outline — 1 annular face."""
+        faces = self._glyph_faces("O")
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_letter_D(self):
+        """Letter D has an outer outline and one hole — 1 face."""
+        faces = self._glyph_faces("D")
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_digit_8(self):
+        """Digit 8 has an outer outline and two holes — 1 face."""
+        faces = self._glyph_faces("8")
+        self.assertEqual(len(faces), 1)
+        self.assertGreater(faces[0].Area, 0)
+
+    def test_multiple_chars(self):
+        """Multiple characters each produce valid faces."""
+        for char in "HELLO":
+            wires = Part.makeWireString(char, _FONT_PATH + "/", _FONT_FILE, 10.0, 0.0)
+            self.assertEqual(len(wires), 1)
+            comp = Part.Compound(wires[0])
+            faces = Part.makeFace(comp, "Part::FaceMakerFishEye").Faces
+            self.assertGreater(len(faces), 0, f"No faces for '{char}'")
+            self.assertGreater(total_area(faces), 0, f"Zero area for '{char}'")
+
 
 _MIXINS = [
     _SingleShape,
