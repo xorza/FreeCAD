@@ -79,6 +79,14 @@
 #include "ViewProviderSketchGeometryExtension.h"
 #include "Workbench.h"
 
+#include <BRep_Builder.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <Precision.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
+
 #include <Mod/Part/Gui/SoFCShapeObject.h>
 
 
@@ -3373,6 +3381,63 @@ bool ViewProviderSketch::getElementPicked(const SoPickedPoint* pp, std::string& 
     }
 
     return ViewProvider2DObject::getElementPicked(pp, subname);
+}
+
+std::vector<std::pair<std::string, std::string>> ViewProviderSketch::getRelatedElements(
+    const std::string& subname,
+    const SbVec3f& pickPoint
+) const
+{
+    std::vector<std::pair<std::string, std::string>> result;
+
+    if (!boost::starts_with(subname, "Edge") && !boost::starts_with(subname, "InternalEdge")) {
+        return result;
+    }
+
+    const auto& internalShape = getSketchObject()->InternalShape.getShape();
+    if (internalShape.isNull()) {
+        return result;
+    }
+
+    const TopoDS_Shape& shape = internalShape.getShape();
+
+    TopTools_IndexedDataMapOfShapeListOfShape edgeToFaces;
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeToFaces);
+
+    TopTools_IndexedMapOfShape faceMap;
+    TopExp::MapShapes(shape, TopAbs_FACE, faceMap);
+
+    // Find the internal edge nearest to the pick point.
+    // The picked element may be a full unsplit edge from the main Shape,
+    // but we want only the split segment closest to where the user clicked.
+    gp_Pnt pickPt(pickPoint[0], pickPoint[1], pickPoint[2]);
+    TopoDS_Vertex pickVertex;
+    BRep_Builder().MakeVertex(pickVertex, pickPt, Precision::Confusion());
+
+    double bestDist = std::numeric_limits<double>::max();
+    int bestEdgeIdx = 0;
+    for (int i = 1; i <= edgeToFaces.Extent(); i++) {
+        BRepExtrema_DistShapeShape dist(pickVertex, edgeToFaces.FindKey(i));
+        if (dist.IsDone() && dist.Value() < bestDist) {
+            bestDist = dist.Value();
+            bestEdgeIdx = i;
+        }
+    }
+
+    if (bestEdgeIdx == 0) {
+        return result;
+    }
+
+    const TopTools_ListOfShape& faces = edgeToFaces.FindFromIndex(bestEdgeIdx);
+    for (TopTools_ListIteratorOfListOfShape it(faces); it.More(); it.Next()) {
+        int faceIdx = faceMap.FindIndex(it.Value());
+        if (faceIdx > 0) {
+            std::string idx = std::to_string(faceIdx);
+            result.push_back({"Face" + idx, SketchObject::internalPrefix() + "Face" + idx});
+        }
+    }
+
+    return result;
 }
 
 bool ViewProviderSketch::getDetailPath(
