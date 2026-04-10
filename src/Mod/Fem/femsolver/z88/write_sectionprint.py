@@ -21,28 +21,39 @@
 # *                                                                         *
 # ***************************************************************************
 
-__title__ = "Write element2D for Z88 solver"
+__title__ = "Write section print for Z88 solver"
 __author__ = "Mario Passaglia"
 __url__ = "https://www.freecad.org"
+
+import numpy as np
 
 from .writer_list import WriterList
 
 
-class WriterElement2D(WriterList):
+class WriterSectionPrint(WriterList):
     def __init__(self, writer):
-        super().__init__(writer, writer.member.geos_shellthickness)
-
-    def write_items(self):
-        super().write_items()
-        self.writer.z88elp_rows = self.fill_default(self.writer.z88elp_rows, self.get_param)
+        super().__init__(writer, writer.member.cons_sectionprint)
 
     def write_item(self, item):
         obj = item["Object"]
-        if not obj.References:
+
+        if obj.Variable != "Section Force":
             return
 
-        param = self.get_param(obj)
-        self.add_file_rows(item["ShellElements"], self.writer.z88elp_rows, param)
+        idx_collection = set()
+        for feat, surf, is_sub_el in item["SectionPrintFaces"]:
+            if is_sub_el:
+                for el, mask in surf:
+                    el_index = self.writer.element_id_map[el]
+                    size = self.writer.elements["size"][el_index]
+                    nodes_array = self.writer.elements["nodes"][el_index][:size]
+                    # Z88 nodes start from 1. Subtract 1 to get row in nodes array
+                    idx_collection.update((nodes_array[mask] - 1).tolist())
+            else:
+                for el in surf:
+                    el_index = self.writer.element_id_map[el]
+                    size = self.writer.elements["size"][el_index]
+                    nodes_array = self.writer.elements["nodes"][el_index][:size]
+                    idx_collection.update((nodes_array - 1).tolist())
 
-    def get_param(self, obj):
-        return obj.Thickness.getValueAs("mm").Value
+        self.writer.z88section_print_dict[obj.Name] = idx_collection
