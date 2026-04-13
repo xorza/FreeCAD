@@ -27,6 +27,7 @@
 #include "FaceMaker.h"
 
 #include <gp_Pln.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Wire.hxx>
 
 #include <Mod/Part/PartGlobal.h>
@@ -65,15 +66,8 @@ private:
     bool planeSupplied {false};
 
     bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane) const;
-    std::vector<TopoDS_Wire> splitSelfIntersecting(
-        const std::vector<TopoDS_Wire>& inputWires,
-        const gp_Pln& plane
-    );
-    std::vector<TopoDS_Wire> fuseOverlaps(
-        const std::vector<TopoDS_Wire>& inputWires,
-        const gp_Pln& plane
-    );
-    void buildPlanar(const std::vector<TopoDS_Wire>& wires, const gp_Pln& plane);
+    TopTools_ListOfShape splitSelfIntersecting(const TopTools_ListOfShape& edges, const gp_Pln& plane);
+    void buildPlanar(const TopTools_ListOfShape& edges, const gp_Pln& plane);
 };
 
 }  // namespace Part
