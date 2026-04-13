@@ -65,6 +65,11 @@ private:
     bool planeSupplied {false};
 
     bool findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& plane) const;
+    std::vector<TopoDS_Wire>
+    splitSelfIntersecting(const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane);
+    std::vector<TopoDS_Wire>
+    fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane);
+    void buildPlanar(const std::vector<TopoDS_Wire>& wires, const gp_Pln& plane);
 };
 
 }  // namespace Part

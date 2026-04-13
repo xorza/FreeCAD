@@ -35,6 +35,7 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepGProp.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
@@ -132,13 +133,10 @@ bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& 
     return true;
 }
 
-namespace
-{
-
-// BSplines that cross themselves (figure-8) must be split at the crossing
-// before the face pipeline can produce separate lobes.
-
-std::vector<TopoDS_Wire> splitSelfIntersecting(
+// Split self-intersecting edges (e.g., figure-8 BSplines) at their crossing
+// points.  Records the mapping original -> fragments in myPreSplitHistory so
+// that postBuild() can chain it with mySplitter for proper element naming.
+std::vector<TopoDS_Wire> FaceMakerFishEye::splitSelfIntersecting(
     const std::vector<TopoDS_Wire>& inputWires,
     const gp_Pln& plane
 )
@@ -203,13 +201,12 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
 
                 // Split into sub-edges
                 Standard_Real prev = first;
-                bool didSplit = false;
+                TopTools_ListOfShape fragments;
                 for (Standard_Real p : params) {
                     if (p - prev > tol) {
                         BRepBuilderAPI_MakeEdge me(curve, prev, p);
                         if (me.IsDone()) {
-                            wireEdges.Append(me.Edge());
-                            didSplit = true;
+                            fragments.Append(me.Edge());
                         }
                         prev = p;
                     }
@@ -217,12 +214,18 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
                 if (last - prev > tol) {
                     BRepBuilderAPI_MakeEdge me(curve, prev, last);
                     if (me.IsDone()) {
-                        wireEdges.Append(me.Edge());
-                        didSplit = true;
+                        fragments.Append(me.Edge());
                     }
                 }
 
-                if (didSplit) {
+                if (fragments.Size() > 0) {
+                    if (myPreSplitHistory.IsNull()) {
+                        myPreSplitHistory = new BRepTools_History();
+                    }
+                    for (TopTools_ListIteratorOfListOfShape fi(fragments); fi.More(); fi.Next()) {
+                        myPreSplitHistory->AddModified(edge, fi.Value());
+                        wireEdges.Append(fi.Value());
+                    }
                     wireSplit = true;
                 }
                 else {
@@ -252,7 +255,7 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
     }
 
     // Reassemble split edges into wires (EdgesToWires creates shared vertices
-    // at crossing points via its internal BOPAlgo_Builder)
+    // at crossing points via its internal BOPAlgo_Builder).
     BRep_Builder builder;
     TopoDS_Compound comp;
     builder.MakeCompound(comp);
@@ -264,8 +267,48 @@ std::vector<TopoDS_Wire> splitSelfIntersecting(
     for (TopExp_Explorer exp(wireShape, TopAbs_WIRE); exp.More(); exp.Next()) {
         result.push_back(TopoDS::Wire(exp.Current()));
     }
+
+    // EdgesToWires may create new edge TShapes, so the fragment edges
+    // recorded in myPreSplitHistory might not match the edges in the
+    // output wires.  Rebuild the history using the actual output wire
+    // edges: for each output edge, find the original edge whose fragment
+    // shares the same 3D curve, and record original → output edge.
+    if (!myPreSplitHistory.IsNull()) {
+        myPreSplitHistory = new BRepTools_History();
+        for (const auto& w : result) {
+            for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+                const TopoDS_Edge& wireEdge = TopoDS::Edge(exp.Current());
+                // Find which original edge this wire edge came from by
+                // comparing the underlying 3D curve handle.
+                Standard_Real wf, wl;
+                Handle(Geom_Curve) wireCurve = BRep_Tool::Curve(wireEdge, wf, wl);
+                for (const auto& origWire : inputWires) {
+                    for (TopExp_Explorer oe(origWire, TopAbs_EDGE); oe.More(); oe.Next()) {
+                        const TopoDS_Edge& origEdge = TopoDS::Edge(oe.Current());
+                        Standard_Real of, ol;
+                        Handle(Geom_Curve) origCurve = BRep_Tool::Curve(origEdge, of, ol);
+                        if (!origCurve.IsNull() && origCurve == wireCurve) {
+                            myPreSplitHistory->AddModified(origEdge, wireEdge);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        BRep_Builder compBuilder;
+        compBuilder.MakeCompound(myPreSplitCompound);
+        for (const auto& w : result) {
+            for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+                compBuilder.Add(myPreSplitCompound, exp.Current());
+            }
+        }
+    }
     return result;
 }
+
+namespace
+{
 
 // Partially overlapping closed wires are fused into their union so that
 // even-odd classification can treat each Venn region independently.
@@ -293,7 +336,15 @@ struct WireFace
     double area {0.0};
 };
 
-std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane)
+}  // namespace
+
+// Partially overlapping closed wires are fused into their union so that
+// even-odd classification can treat each Venn region independently.
+// Full containment (hole inside outer) is preserved for even-odd nesting.
+// Composes fuse history into myPreSplitHistory so postBuild() can trace
+// names through self-intersection splitting + fusion in one stage.
+std::vector<TopoDS_Wire> FaceMakerFishEye::fuseOverlaps(
+    const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane)
 {
     int n = static_cast<int>(inputWires.size());
 
@@ -336,8 +387,6 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
                 continue;
             }
             const double ca = shapeArea(common.Shape());
-            // Partial overlap: intersection area is nonzero but smaller than
-            // either face. Full containment (hole-in-outer) is excluded.
             if (ca > tol && ca < wfs[i].area - tol && ca < wfs[j].area - tol) {
                 unite(parent, i, j);
                 hasOverlaps = true;
@@ -348,11 +397,16 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
         return inputWires;
     }
 
-    // Fuse each overlap group
+    // Fuse each overlap group, tracking history for element naming
     std::map<int, std::vector<int>> groups;
     for (int i = 0; i < n; ++i) {
         groups[findRoot(parent, i)].push_back(i);
     }
+
+    // Save existing pre-split history (from splitSelfIntersecting) so we
+    // can compose it with the fuse history into a single mapping.
+    Handle(BRepTools_History) preSplitHist = myPreSplitHistory;
+    Handle(BRepTools_History) fuseHist;
 
     std::vector<TopoDS_Wire> result;
     for (auto& [root, indices] : groups) {
@@ -362,6 +416,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
         }
         TopoDS_Shape fused;
         bool valid = false;
+        std::vector<Handle(BRepTools_History)> stepHistories;
         for (int idx : indices) {
             if (wfs[idx].face.IsNull()) {
                 continue;
@@ -373,6 +428,7 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             else {
                 BRepAlgoAPI_Fuse fuseOp(fused, wfs[idx].face);
                 if (fuseOp.IsDone() && !fuseOp.Shape().IsNull()) {
+                    stepHistories.push_back(fuseOp.History());
                     fused = fuseOp.Shape();
                 }
             }
@@ -383,6 +439,47 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             }
             continue;
         }
+
+        // Trace each input wire edge through the chain of fuse histories
+        // to find the final fused edges, then record the mapping.
+        if (!stepHistories.empty()) {
+            if (fuseHist.IsNull()) {
+                fuseHist = new BRepTools_History();
+            }
+            for (int idx : indices) {
+                for (TopExp_Explorer exp(wfs[idx].wire, TopAbs_EDGE); exp.More(); exp.Next()) {
+                    const TopoDS_Edge& inputEdge = TopoDS::Edge(exp.Current());
+                    TopTools_ListOfShape current;
+                    current.Append(inputEdge);
+
+                    for (const auto& hist : stepHistories) {
+                        TopTools_ListOfShape next;
+                        for (TopTools_ListIteratorOfListOfShape ci(current); ci.More(); ci.Next()) {
+                            const TopTools_ListOfShape& modified = hist->Modified(ci.Value());
+                            if (modified.IsEmpty()) {
+                                if (!hist->IsRemoved(ci.Value())) {
+                                    next.Append(ci.Value());
+                                }
+                            }
+                            else {
+                                for (TopTools_ListIteratorOfListOfShape mi(modified);
+                                     mi.More(); mi.Next()) {
+                                    next.Append(mi.Value());
+                                }
+                            }
+                        }
+                        current = next;
+                    }
+
+                    for (TopTools_ListIteratorOfListOfShape fi(current); fi.More(); fi.Next()) {
+                        if (!inputEdge.IsSame(fi.Value())) {
+                            fuseHist->AddModified(inputEdge, fi.Value());
+                        }
+                    }
+                }
+            }
+        }
+
         for (TopExp_Explorer fExp(fused, TopAbs_FACE); fExp.More(); fExp.Next()) {
             TopoDS_Wire outerWire = BRepTools::OuterWire(TopoDS::Face(fExp.Current()));
             if (!outerWire.IsNull()) {
@@ -390,17 +487,79 @@ std::vector<TopoDS_Wire> fuseOverlaps(const std::vector<TopoDS_Wire>& inputWires
             }
         }
     }
+
+    if (fuseHist.IsNull()) {
+        return result;
+    }
+
+    // Compose pre-split + fuse histories into a single myPreSplitHistory.
+    // Iterate the true original edges (myWires, before any modification),
+    // trace each through preSplitHist (original → fragment) then fuseHist
+    // (fragment → fused), and record original → fused in the new history.
+    if (preSplitHist.IsNull()) {
+        // No self-intersection splitting happened — the input wire edges
+        // ARE the original source edges, so fuseHist maps directly.
+        myPreSplitHistory = fuseHist;
+    }
+    else {
+        myPreSplitHistory = new BRepTools_History();
+        for (const auto& w : myWires) {
+            for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+                const TopoDS_Edge& origEdge = TopoDS::Edge(exp.Current());
+                const TopTools_ListOfShape& fragments = preSplitHist->Modified(origEdge);
+                if (fragments.IsEmpty()) {
+                    // Edge was not split — trace it directly through fuse
+                    const TopTools_ListOfShape& fused = fuseHist->Modified(origEdge);
+                    if (!fused.IsEmpty()) {
+                        for (TopTools_ListIteratorOfListOfShape fi(fused); fi.More(); fi.Next()) {
+                            myPreSplitHistory->AddModified(origEdge, fi.Value());
+                        }
+                    }
+                    else if (!fuseHist->IsRemoved(origEdge)) {
+                        // Unchanged by both stages — no entry needed
+                    }
+                }
+                else {
+                    // Edge was split into fragments — trace each through fuse
+                    for (TopTools_ListIteratorOfListOfShape pi(fragments); pi.More(); pi.Next()) {
+                        const TopoDS_Shape& fragment = pi.Value();
+                        const TopTools_ListOfShape& fused = fuseHist->Modified(fragment);
+                        if (!fused.IsEmpty()) {
+                            for (TopTools_ListIteratorOfListOfShape fi(fused);
+                                 fi.More(); fi.Next()) {
+                                myPreSplitHistory->AddModified(origEdge, fi.Value());
+                            }
+                        }
+                        else if (!fuseHist->IsRemoved(fragment)) {
+                            // Fragment unchanged by fuse — carry forward
+                            myPreSplitHistory->AddModified(origEdge, fragment);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Rebuild compound from all output wire edges
+    BRep_Builder compBuilder;
+    compBuilder.MakeCompound(myPreSplitCompound);
+    for (const auto& w : result) {
+        for (TopExp_Explorer exp(w, TopAbs_EDGE); exp.More(); exp.Next()) {
+            compBuilder.Add(myPreSplitCompound, exp.Current());
+        }
+    }
     return result;
 }
 
 // Pipeline: BRepAlgoAPI_BuilderAlgo (split edges at intersections)
-//         → BOPAlgo_BuilderFace (find all bounded regions)
-//         → even-odd classification (nesting/holes)
+//         -> BOPAlgo_BuilderFace (find all bounded regions)
+//         -> even-odd classification (nesting/holes)
+// Uses the base class mySplitter so postBuild() can chain its history
+// with myPreSplitHistory for proper element naming.
 
-void buildPlanar(
+void FaceMakerFishEye::buildPlanar(
     const std::vector<TopoDS_Wire>& wires,
-    const gp_Pln& plane,
-    std::vector<TopoDS_Shape>& result
+    const gp_Pln& plane
 )
 {
     // Collect all edges
@@ -414,17 +573,16 @@ void buildPlanar(
         return;
     }
 
-    // Split edges at mutual intersections
+    // Split edges at mutual intersections using the base class mySplitter
     TopTools_ListOfShape splitEdges = edges;
     if (edges.Size() > 1) {
-        BRepAlgoAPI_BuilderAlgo splitter;
-        splitter.SetArguments(edges);
-        splitter.SetRunParallel(true);
-        splitter.SetNonDestructive(Standard_True);
-        splitter.Build();
-        if (splitter.IsDone()) {
+        mySplitter.SetArguments(edges);
+        mySplitter.SetRunParallel(true);
+        mySplitter.SetNonDestructive(Standard_True);
+        mySplitter.Build();
+        if (mySplitter.IsDone()) {
             splitEdges.Clear();
-            for (TopExp_Explorer exp(splitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
+            for (TopExp_Explorer exp(mySplitter.Shape(), TopAbs_EDGE); exp.More(); exp.Next()) {
                 splitEdges.Append(exp.Current());
             }
         }
@@ -494,7 +652,7 @@ void buildPlanar(
         gp_Pnt pt;
         gp_Pnt2d pt2d;
         if (BOPTools_AlgoTools3D::PointInFace(face, pt, pt2d, ctx) != 0) {
-            result.push_back(face);
+            myShapesToReturn.push_back(face);
             continue;
         }
 
@@ -506,10 +664,13 @@ void buildPlanar(
         }
 
         if (count == 0 || count % 2 == 1) {
-            result.push_back(face);
+            myShapesToReturn.push_back(face);
         }
     }
 }
+
+namespace
+{
 
 TopoDS_Face fillNonPlanar(const TopoDS_Wire& wire)
 {
@@ -552,7 +713,7 @@ void FaceMakerFishEye::Build_Essence()
     if (planar) {
         std::vector<TopoDS_Wire> wires = splitSelfIntersecting(myWires, plane);
         wires = fuseOverlaps(wires, plane);
-        buildPlanar(wires, plane, myShapesToReturn);
+        buildPlanar(wires, plane);
     }
     else {
         // Non-planar: try MakeFace (analytical surfaces like cylinders),
