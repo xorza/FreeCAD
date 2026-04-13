@@ -10,13 +10,9 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <GC_MakeCircle.hxx>
-#include <Geom_BSplineCurve.hxx>
 #include <GeomAPI_Interpolate.hxx>
 #include <gp_Pln.hxx>
-#include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
-
-#include <numbers>
 
 // NOLINTBEGIN(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
 
@@ -56,8 +52,7 @@ protected:
     static TopoDS_Wire makeLineWire(double x0, double y0, double x1, double y1)
     {
         return BRepBuilderAPI_MakeWire(
-                   BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge()
-        )
+            BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge())
             .Wire();
     }
 
@@ -76,18 +71,15 @@ protected:
         Handle(TColgp_HArray1OfPnt) hpoints = new TColgp_HArray1OfPnt(points);
         GeomAPI_Interpolate interp(hpoints, Standard_False, Precision::Confusion());
         interp.Perform();
-        auto edge = BRepBuilderAPI_MakeEdge(interp.Curve()).Edge();
-        return BRepBuilderAPI_MakeWire(edge).Wire();
+        return BRepBuilderAPI_MakeWire(
+            BRepBuilderAPI_MakeEdge(interp.Curve()).Edge())
+            .Wire();
     }
 
-    /// Call makeElementFace with FishEye and source TopoShapes that have
-    /// proper Tags so that element naming is exercised.
     TopoShape makeFishEyeFace(const std::vector<TopoDS_Wire>& wires)
     {
         auto hasher = _doc->getStringHasher();
         long tag = 1;
-
-        // Wrap each wire in a TopoShape with a unique tag and element map
         std::vector<TopoShape> sources;
         for (const auto& w : wires) {
             TopoShape ts(tag++, hasher);
@@ -95,110 +87,120 @@ protected:
             ts.mapSubElement(ts);
             sources.push_back(std::move(ts));
         }
-
         TopoShape result(tag, hasher);
         result.makeElementFace(sources, nullptr, "Part::FaceMakerFishEye", nullptr);
         return result;
+    }
+
+    void expectAllEdgesNamed(const TopoShape& shape)
+    {
+        int count = shape.countSubShapes(TopAbs_EDGE);
+        ASSERT_GT(count, 0);
+        for (int i = 1; i <= count; ++i) {
+            auto indexed = Data::IndexedName::fromConst("Edge", i);
+            auto mapped = shape.getMappedName(indexed);
+            EXPECT_TRUE(mapped) << "Edge" << i << " has no mapped name";
+            if (mapped) {
+                EXPECT_NE(mapped.toString(), indexed.toString())
+                    << "Edge" << i << " has identity mapping (unnamed)";
+            }
+        }
+    }
+
+    void expectAllFacesNamed(const TopoShape& shape)
+    {
+        int count = shape.countSubShapes(TopAbs_FACE);
+        ASSERT_GT(count, 0);
+        for (int i = 1; i <= count; ++i) {
+            auto indexed = Data::IndexedName::fromConst("Face", i);
+            auto mapped = shape.getMappedName(indexed);
+            EXPECT_TRUE(mapped) << "Face" << i << " has no mapped name";
+            if (mapped) {
+                EXPECT_NE(mapped.toString(), indexed.toString())
+                    << "Face" << i << " has identity mapping (unnamed)";
+            }
+        }
+    }
+
+    void expectNamingStable(const std::vector<TopoDS_Wire>& wires)
+    {
+        auto r1 = makeFishEyeFace(wires);
+        auto r2 = makeFishEyeFace(wires);
+        int edgeCount = r1.countSubShapes(TopAbs_EDGE);
+        ASSERT_EQ(edgeCount, r2.countSubShapes(TopAbs_EDGE));
+        for (int i = 1; i <= edgeCount; ++i) {
+            auto idx = Data::IndexedName::fromConst("Edge", i);
+            EXPECT_EQ(r1.getMappedName(idx), r2.getMappedName(idx))
+                << "Edge" << i << " name differs across builds";
+        }
+        int faceCount = r1.countSubShapes(TopAbs_FACE);
+        ASSERT_EQ(faceCount, r2.countSubShapes(TopAbs_FACE));
+        for (int i = 1; i <= faceCount; ++i) {
+            auto idx = Data::IndexedName::fromConst("Face", i);
+            EXPECT_EQ(r1.getMappedName(idx), r2.getMappedName(idx))
+                << "Face" << i << " name differs across builds";
+        }
     }
 
     std::string _docName;
     App::Document* _doc = nullptr;
 };
 
-// Rectangle + diagonal: edges split at intersection, no fuseOverlaps involved.
-// This tests the mySplitter history tracking in buildPlanar.
-TEST_F(FaceMakerFishEyeTest, subdivisionEdgesHaveMappedNames)
+// No splitting — baseline: names should exist even without edge modifications.
+TEST_F(FaceMakerFishEyeTest, singleRectangleNaming)
+{
+    auto result = makeFishEyeFace({makeRectWire(0, 0, 10, 10)});
+    ASSERT_EQ(result.countSubShapes(TopAbs_FACE), 1);
+    expectAllEdgesNamed(result);
+    expectAllFacesNamed(result);
+}
+
+// Inter-edge splits via mySplitter (diagonal crosses rectangle edges).
+TEST_F(FaceMakerFishEyeTest, subdivisionNaming)
 {
     auto result = makeFishEyeFace({makeRectWire(0, 0, 10, 10), makeLineWire(0, 0, 10, 10)});
-
-    // Diagonal splits rectangle into 2 triangles
     ASSERT_GE(result.countSubShapes(TopAbs_FACE), 2);
-
-    int edgeCount = result.countSubShapes(TopAbs_EDGE);
-    ASSERT_GT(edgeCount, 0);
-    for (int i = 1; i <= edgeCount; ++i) {
-        auto indexed = Data::IndexedName::fromConst("Edge", i);
-        auto mapped = result.getMappedName(indexed);
-        EXPECT_TRUE(mapped) << "Edge" << i << " has no mapped name";
-        if (mapped) {
-            std::string mappedStr = mapped.toString();
-            std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
-        }
-    }
+    expectAllEdgesNamed(result);
+    expectAllFacesNamed(result);
 }
 
-TEST_F(FaceMakerFishEyeTest, subdivisionNamingStable)
-{
-    auto result1 = makeFishEyeFace({makeRectWire(0, 0, 10, 10), makeLineWire(0, 0, 10, 10)});
-    auto result2 = makeFishEyeFace({makeRectWire(0, 0, 10, 10), makeLineWire(0, 0, 10, 10)});
-
-    int edgeCount = result1.countSubShapes(TopAbs_EDGE);
-    ASSERT_EQ(edgeCount, result2.countSubShapes(TopAbs_EDGE));
-    for (int i = 1; i <= edgeCount; ++i) {
-        auto indexed = Data::IndexedName::fromConst("Edge", i);
-        auto mapped1 = result1.getMappedName(indexed);
-        auto mapped2 = result2.getMappedName(indexed);
-        EXPECT_EQ(mapped1, mapped2) << "Edge" << i << " name differs across builds";
-    }
-}
-
-// Two overlapping rectangles: fuseOverlaps creates new edges via BRepAlgoAPI_Fuse.
-// The fuse history must trace fused edges back to the original rectangle edges.
-TEST_F(FaceMakerFishEyeTest, fusedOverlapEdgesHaveMappedNames)
+// Partially overlapping rectangles — group-aware even-odd classification.
+TEST_F(FaceMakerFishEyeTest, overlappingRectsNaming)
 {
     auto result = makeFishEyeFace({makeRectWire(0, 0, 20, 20), makeRectWire(10, 10, 30, 30)});
-
     ASSERT_GE(result.countSubShapes(TopAbs_FACE), 1);
-
-    int edgeCount = result.countSubShapes(TopAbs_EDGE);
-    ASSERT_GT(edgeCount, 0);
-    for (int i = 1; i <= edgeCount; ++i) {
-        auto indexed = Data::IndexedName::fromConst("Edge", i);
-        auto mapped = result.getMappedName(indexed);
-        EXPECT_TRUE(mapped) << "Edge" << i << " has no mapped name";
-        if (mapped) {
-            std::string mappedStr = mapped.toString();
-            std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
-        }
-    }
+    expectAllEdgesNamed(result);
+    expectAllFacesNamed(result);
 }
 
-TEST_F(FaceMakerFishEyeTest, splitBSplineEdgesHaveMappedNames)
+// Self-intersecting B-spline — myPreSplitHistory tracks fragments.
+TEST_F(FaceMakerFishEyeTest, selfIntersectingBSplineNaming)
 {
     auto result = makeFishEyeFace({makeFigure8Wire()});
-
-    // Figure-8 should produce at least 2 faces
     ASSERT_GE(result.countSubShapes(TopAbs_FACE), 2);
-
-    int edgeCount = result.countSubShapes(TopAbs_EDGE);
-    ASSERT_GT(edgeCount, 0);
-    for (int i = 1; i <= edgeCount; ++i) {
-        auto indexed = Data::IndexedName::fromConst("Edge", i);
-        auto mapped = result.getMappedName(indexed);
-        EXPECT_TRUE(mapped) << "Edge" << i << " has no mapped name";
-        if (mapped) {
-            std::string mappedStr = mapped.toString();
-            std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
-        }
-    }
+    expectAllEdgesNamed(result);
+    expectAllFacesNamed(result);
 }
 
-TEST_F(FaceMakerFishEyeTest, splitBSplineNamingStable)
+// Stability tests — names must be identical across rebuilds.
+TEST_F(FaceMakerFishEyeTest, singleRectangleStable)
 {
-    auto result1 = makeFishEyeFace({makeFigure8Wire()});
-    auto result2 = makeFishEyeFace({makeFigure8Wire()});
+    expectNamingStable({makeRectWire(0, 0, 10, 10)});
+}
 
-    int edgeCount = result1.countSubShapes(TopAbs_EDGE);
-    ASSERT_EQ(edgeCount, result2.countSubShapes(TopAbs_EDGE));
-    for (int i = 1; i <= edgeCount; ++i) {
-        auto indexed = Data::IndexedName::fromConst("Edge", i);
-        auto mapped1 = result1.getMappedName(indexed);
-        auto mapped2 = result2.getMappedName(indexed);
-        EXPECT_EQ(mapped1, mapped2) << "Edge" << i << " name differs across builds";
-    }
+TEST_F(FaceMakerFishEyeTest, subdivisionStable)
+{
+    expectNamingStable({makeRectWire(0, 0, 10, 10), makeLineWire(0, 0, 10, 10)});
+}
+
+TEST_F(FaceMakerFishEyeTest, overlappingRectsStable)
+{
+    expectNamingStable({makeRectWire(0, 0, 20, 20), makeRectWire(10, 10, 30, 30)});
+}
+
+TEST_F(FaceMakerFishEyeTest, selfIntersectingBSplineStable)
+{
+    expectNamingStable({makeFigure8Wire()});
 }
 
 // NOLINTEND(readability-magic-numbers,cppcoreguidelines-avoid-magic-numbers)
