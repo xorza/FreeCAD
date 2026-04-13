@@ -52,7 +52,8 @@ protected:
     static TopoDS_Wire makeLineWire(double x0, double y0, double x1, double y1)
     {
         return BRepBuilderAPI_MakeWire(
-            BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge())
+                   BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge()
+        )
             .Wire();
     }
 
@@ -71,9 +72,7 @@ protected:
         Handle(TColgp_HArray1OfPnt) hpoints = new TColgp_HArray1OfPnt(points);
         GeomAPI_Interpolate interp(hpoints, Standard_False, Precision::Confusion());
         interp.Perform();
-        return BRepBuilderAPI_MakeWire(
-            BRepBuilderAPI_MakeEdge(interp.Curve()).Edge())
-            .Wire();
+        return BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(interp.Curve()).Edge()).Wire();
     }
 
     TopoShape makeFishEyeFace(const std::vector<TopoDS_Wire>& wires)
