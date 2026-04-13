@@ -319,8 +319,12 @@ class ShapeString(DraftObject):
         #     All fonts: face creation problem in case of double-nested wires f.e. with: ©.
         # FaceMakerSimple:
         #     All fonts: overlapping faces in case of nested wires f.e. with: O.
-        for maker in ("Part::FaceMakerFishEye", "Part::FaceMakerBullseye",
-                      "Part::FaceMakerCheese", "Part::FaceMakerSimple"):
+        for maker in (
+            "Part::FaceMakerFishEye",
+            "Part::FaceMakerBullseye",
+            "Part::FaceMakerCheese",
+            "Part::FaceMakerSimple",
+        ):
             try:
                 faces = Part.makeFace(wirelist, maker).Faces
                 for face in faces:
