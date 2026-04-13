@@ -56,8 +56,9 @@ protected:
     static TopoDS_Wire makeLineWire(double x0, double y0, double x1, double y1)
     {
         return BRepBuilderAPI_MakeWire(
-            BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge()
-        ).Wire();
+                   BRepBuilderAPI_MakeEdge(gp_Pnt(x0, y0, 0), gp_Pnt(x1, y1, 0)).Edge()
+        )
+            .Wire();
     }
 
     static TopoDS_Wire makeFigure8Wire()
@@ -122,8 +123,7 @@ TEST_F(FaceMakerFishEyeTest, subdivisionEdgesHaveMappedNames)
         if (mapped) {
             std::string mappedStr = mapped.toString();
             std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr)
-                << "Edge" << i << " has identity mapping (unnamed)";
+            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
         }
     }
 }
@@ -160,8 +160,7 @@ TEST_F(FaceMakerFishEyeTest, fusedOverlapEdgesHaveMappedNames)
         if (mapped) {
             std::string mappedStr = mapped.toString();
             std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr)
-                << "Edge" << i << " has identity mapping (unnamed)";
+            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
         }
     }
 }
@@ -182,8 +181,7 @@ TEST_F(FaceMakerFishEyeTest, splitBSplineEdgesHaveMappedNames)
         if (mapped) {
             std::string mappedStr = mapped.toString();
             std::string indexedStr = indexed.toString();
-            EXPECT_NE(mappedStr, indexedStr)
-                << "Edge" << i << " has identity mapping (unnamed)";
+            EXPECT_NE(mappedStr, indexedStr) << "Edge" << i << " has identity mapping (unnamed)";
         }
     }
 }

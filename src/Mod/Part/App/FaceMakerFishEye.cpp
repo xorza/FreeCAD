@@ -344,7 +344,9 @@ struct WireFace
 // Composes fuse history into myPreSplitHistory so postBuild() can trace
 // names through self-intersection splitting + fusion in one stage.
 std::vector<TopoDS_Wire> FaceMakerFishEye::fuseOverlaps(
-    const std::vector<TopoDS_Wire>& inputWires, const gp_Pln& plane)
+    const std::vector<TopoDS_Wire>& inputWires,
+    const gp_Pln& plane
+)
 {
     int n = static_cast<int>(inputWires.size());
 
@@ -462,8 +464,8 @@ std::vector<TopoDS_Wire> FaceMakerFishEye::fuseOverlaps(
                                 }
                             }
                             else {
-                                for (TopTools_ListIteratorOfListOfShape mi(modified);
-                                     mi.More(); mi.Next()) {
+                                for (TopTools_ListIteratorOfListOfShape mi(modified); mi.More();
+                                     mi.Next()) {
                                     next.Append(mi.Value());
                                 }
                             }
@@ -525,8 +527,7 @@ std::vector<TopoDS_Wire> FaceMakerFishEye::fuseOverlaps(
                         const TopoDS_Shape& fragment = pi.Value();
                         const TopTools_ListOfShape& fused = fuseHist->Modified(fragment);
                         if (!fused.IsEmpty()) {
-                            for (TopTools_ListIteratorOfListOfShape fi(fused);
-                                 fi.More(); fi.Next()) {
+                            for (TopTools_ListIteratorOfListOfShape fi(fused); fi.More(); fi.Next()) {
                                 myPreSplitHistory->AddModified(origEdge, fi.Value());
                             }
                         }
@@ -557,10 +558,7 @@ std::vector<TopoDS_Wire> FaceMakerFishEye::fuseOverlaps(
 // Uses the base class mySplitter so postBuild() can chain its history
 // with myPreSplitHistory for proper element naming.
 
-void FaceMakerFishEye::buildPlanar(
-    const std::vector<TopoDS_Wire>& wires,
-    const gp_Pln& plane
-)
+void FaceMakerFishEye::buildPlanar(const std::vector<TopoDS_Wire>& wires, const gp_Pln& plane)
 {
     // Collect all edges
     TopTools_ListOfShape edges;
