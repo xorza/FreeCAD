@@ -109,15 +109,14 @@ int findRoot(std::vector<int>& parent, int i)
 // Detect partially overlapping wire groups using union-find.
 // Returns a group ID per wire.  Wires that partially overlap share a group.
 // Full containment (hole-in-outer) is NOT grouped — even-odd handles that.
-std::vector<int> findOverlapGroups(
-    const std::vector<TopoDS_Wire>& wires,
-    const gp_Pln& plane)
+std::vector<int> findOverlapGroups(const std::vector<TopoDS_Wire>& wires, const gp_Pln& plane)
 {
     int n = static_cast<int>(wires.size());
     std::vector<int> parent(n);
     std::iota(parent.begin(), parent.end(), 0);
 
-    struct WireInfo {
+    struct WireInfo
+    {
         TopoDS_Face face;
         Bnd_Box box;
         double area = 0;
@@ -193,7 +192,8 @@ bool FaceMakerFishEye::findPlane(const std::vector<TopoDS_Wire>& wires, gp_Pln& 
 // records original → fragment in myPreSplitHistory + myPreSplitCompound.
 TopTools_ListOfShape FaceMakerFishEye::splitSelfIntersecting(
     const TopTools_ListOfShape& edges,
-    const gp_Pln& plane)
+    const gp_Pln& plane
+)
 {
     const Standard_Real tol = Precision::Confusion();
     TopTools_ListOfShape result;
@@ -234,9 +234,13 @@ TopTools_ListOfShape FaceMakerFishEye::splitSelfIntersecting(
             }
             std::sort(params.begin(), params.end());
             params.erase(
-                std::unique(params.begin(), params.end(),
-                    [tol](double a, double b) { return b - a < tol; }),
-                params.end());
+                std::unique(
+                    params.begin(),
+                    params.end(),
+                    [tol](double a, double b) { return b - a < tol; }
+                ),
+                params.end()
+            );
 
             Standard_Real prev = first;
             TopTools_ListOfShape fragments;
@@ -285,9 +289,7 @@ TopTools_ListOfShape FaceMakerFishEye::splitSelfIntersecting(
     return result;
 }
 
-void FaceMakerFishEye::buildPlanar(
-    const TopTools_ListOfShape& edges,
-    const gp_Pln& plane)
+void FaceMakerFishEye::buildPlanar(const TopTools_ListOfShape& edges, const gp_Pln& plane)
 {
     if (edges.IsEmpty()) {
         return;
