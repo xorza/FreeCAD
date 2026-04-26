@@ -2008,13 +2008,7 @@ public:
     )
     {
         if (!BRep_Tool::IsClosed(wire)) {
-            // Path-finding (via the proceed=false branch in
-            // _findClosedWiresWithExisting / _findClosedWiresBeginEdge) can
-            // assemble an edge sequence whose endpoints don't coincide when
-            // the input has closed wires split at internal seam vertices
-            // (e.g. closed ellipses split by intersecting line segments).
-            // Treat as "no closed wire on this path" rather than aborting
-            // the whole build with an exception.
+            // proceed=false path can assemble a non-closing edge sequence; bail out gracefully
             FC_WARN("failed to close some wire in iteration " << iteration);
             showShape(wire, "_FailedToClose", iteration);
             showShape(beginInfo.shape(beginVertex.start), "failed", iteration);
@@ -2101,11 +2095,7 @@ public:
             }
             TopoDS_Wire wire = makeCleanWire();
             if (!_findClosedWiresIsClosed(beginVertex, wire, beginInfo)) {
-                // Stack/vertexStack may have been extended by
-                // _findClosedWiresBeginEdge along an existing wireInfo, so
-                // continuing the while-loop would replay a poisoned state.
-                // Returning empty lets findTightBoundByVertices clean up and
-                // try the next branch (line 2257-2262).
+                // stack was mutated by _findClosedWiresBeginEdge; bail so caller can clean up
                 return {};
             }
             return wire;
