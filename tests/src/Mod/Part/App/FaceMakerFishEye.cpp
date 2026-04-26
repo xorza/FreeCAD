@@ -4,6 +4,7 @@
 #include "src/App/InitApplication.h"
 #include <App/Application.h>
 #include <App/Document.h>
+#include <Base/Interpreter.h>
 #include "Mod/Part/App/FaceMakerFishEye.h"
 #include "Mod/Part/App/TopoShape.h"
 
@@ -24,6 +25,7 @@ protected:
     static void SetUpTestSuite()
     {
         tests::initApplication();
+        Base::Interpreter().runString("import Part");
     }
 
     void SetUp() override
