@@ -27,6 +27,8 @@
 #include <IGESControl_Controller.hxx>
 #include <STEPControl_Controller.hxx>
 #include <Standard_Version.hxx>
+#include <Message.hxx>
+#include <Message_Messenger.hxx>
 
 #include <FCConfig.h>
 
@@ -133,6 +135,7 @@
 #include "TopoShapeWirePy.h"
 #include "ToroidPy.h"
 #include "OCCError.h"
+#include "OCCTMessagePrinter.h"
 #include "PrismExtension.h"
 #include "PropertyGeometryList.h"
 #include "PropertyTopoShapeList.h"
@@ -591,6 +594,10 @@ PyMOD_INIT_FUNC(Part)
     Base::registerServiceImplementation<App::CenterOfMassProvider>(new PartCenterOfMass);
     Base::registerServiceImplementation<App::CustomAttributeProvider>(new ShapeAttributeProvider);
     Base::registerServiceImplementation<App::PseudoShapeProvider>(new PartPseudoShapeProvider);
+
+    Handle(OCCTMessagePrinter) printer = new OCCTMessagePrinter();
+    printer->SetTraceLevel(Message_Trace);
+    Message::DefaultMessenger()->AddPrinter(printer);
 
     PyMOD_Return(partModule);
 }

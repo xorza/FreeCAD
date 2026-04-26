@@ -337,6 +337,7 @@ generate_from_py(LinkView)
 generate_from_py(ViewProviderLink)
 generate_from_py(AxisOrigin)
 generate_from_py(Command)
+generate_from_py(EditableDatumLabel)
 generate_from_py(Navigation/NavigationStyle)
 
 generate_embed_from_py(FreeCADGuiInit GuiInitScript.h)
@@ -356,6 +357,7 @@ SET(FreeCADGui_Pyi_SRCS
     ViewProviderLink.pyi
     AxisOrigin.pyi
     Command.pyi
+    EditableDatumLabel.pyi
 )
 SOURCE_GROUP("Pyi" FILES ${FreeCADGui_Pyi_SRCS})
 
@@ -1243,9 +1245,16 @@ SET(Widget_CPP_SRCS
     FontScaledSVG.cpp
     SplitButton.cpp
 )
+if(WIN32)
+    SET(Widget_CPP_SRCS
+        ${Widget_CPP_SRCS}
+        FileDialogWin32.cpp
+    )
+endif(WIN32)
 SET(Widget_HPP_SRCS
     ComboLinks.h
     FileDialog.h
+    FileDialogInternal.h
     MainWindow.h
     MainWindowPy.h
     NotificationBox.h
@@ -1299,6 +1308,7 @@ SET(View_CPP_SRCS
     MDIView.cpp
     MDIViewPy.cpp
     MDIViewPyWrap.cpp
+    MDIViewWithCamera.cpp
     GraphvizView.cpp
     ImageView.cpp
     ActiveObjectList.cpp
@@ -1307,6 +1317,7 @@ SET(View_HPP_SRCS
     MDIView.h
     MDIViewPy.h
     MDIViewPyWrap.h
+    MDIViewWithCamera.h
     GraphvizView.h
     ImageView.h
     ActiveObjectList.h
@@ -1380,6 +1391,7 @@ SET(FreeCADGui_CPP_SRCS
     DocumentObserver.cpp
     DocumentObserverPython.cpp
     EditableDatumLabel.cpp
+    EditableDatumLabelPyImp.cpp
     ExpressionBinding.cpp
     ExpressionBindingPy.cpp
     GraphicsViewZoom.cpp
