@@ -1235,7 +1235,7 @@ the constraint or material is applied.</source>
     <message>
       <location filename="../../DlgSettingsFemExportAbaqus.ui" line="69"/>
       <source>FEM</source>
-      <translation>МКЭ (Метад канчатковых элементаў)</translation>
+      <translation>МКЭ</translation>
     </message>
     <message>
       <location filename="../../DlgSettingsFemExportAbaqus.ui" line="77"/>
@@ -1645,7 +1645,7 @@ iterative solver and you get the error message
 that "MAXKOI" needs to be increased.</source>
       <translation>Найбольшая колькасць кропак у вектары супадзенняў.
 (колькасць вузлоў на элемент, памножанае на колькасць канчатковых элементаў)
-Магчыма, вам спатрэбіцца павялічыць гэтае значэнне пры ўжыванні паўтарэння сродку рашэння, інакш вы атрымаеце паведамленне пра памылку, што "MAXKOI" неабходна павялічыць.</translation>
+Магчыма, спатрэбіцца павялічыць гэтае значэнне пры ўжыванні паўтарэння сродку рашэння, інакш атрымаеце паведамленне пра памылку, што "MAXKOI" неабходна павялічыць.</translation>
     </message>
     <message>
       <location filename="../../DlgSettingsFemZ88.ui" line="169"/>
@@ -1742,7 +1742,7 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskDlgFemConstraintForce</name>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="476"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="469"/>
       <source>Input error</source>
       <translation>Памылка ўводу</translation>
     </message>
@@ -1827,7 +1827,7 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskDlgPost</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="394"/>
+      <location filename="../../TaskPostBoxes.cpp" line="403"/>
       <source>Input error</source>
       <translation>Памылка ўводу</translation>
     </message>
@@ -2248,55 +2248,55 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskFemConstraintForce</name>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="92"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="93"/>
       <source>Select geometry of type: </source>
       <translation>Абраць геаметрыю тыпу: </translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="92"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="93"/>
       <source>Vertex, Edge, Face</source>
       <translation>Вяршыня, рабро, грань</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="125"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="134"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="142"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="184"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="207"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="216"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="126"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="135"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="143"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="185"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="208"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="217"/>
       <source>Selection error</source>
       <translation>Памылка выбару</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="125"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="207"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="126"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="208"/>
       <source>Nothing selected!</source>
       <translation>Нічога не абрана!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="134"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="216"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="135"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="217"/>
       <source>Selected object is not a part!</source>
       <translation>Абраны аб'ект не з'яўляецца дэталлю!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="143"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="144"/>
       <source>External object selection is not supported</source>
       <translation>Выбар вонкавага аб'екта не падтрымліваецца</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="180"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="181"/>
       <source>Only one type of selection (vertex, face or edge) per analysis feature allowed!</source>
       <translation>Дапускаецца толькі адзін тып выбару (вяршыня, грань ці рабро) для кожнай характарыстыкі аналіза!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="324"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="339"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="317"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="332"/>
       <source>Wrong selection</source>
       <translation>Няправільны выбар</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="324"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="317"/>
       <source>Select an edge or a face.</source>
       <translation>Абраць рабро ці грань.</translation>
     </message>
@@ -2660,12 +2660,12 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskPostDataAlongLine</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="678"/>
+      <location filename="../../TaskPostBoxes.cpp" line="687"/>
       <source>Data Along a Line Options</source>
       <translation>Налады дадзеных наўздоўж лініі</translation>
     </message>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1086"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1095"/>
       <source>Length</source>
       <comment>X-Axis plot label</comment>
       <translation>Даўжыня</translation>
@@ -2674,12 +2674,12 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskPostDataAtPoint</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1120"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1129"/>
       <source>Data at Point Options</source>
       <translation>Налады дадзеных у кропцы</translation>
     </message>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1461"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1470"/>
       <source>%1 at (%2; %3; %4) is: %5 %6</source>
       <translation>%1 у (%2; %3; %4) складае: %5 %6</translation>
     </message>
@@ -2687,7 +2687,7 @@ that "MAXGS" needs to be increased.</source>
   <context>
     <name>FemGui::TaskPostFunction</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="526"/>
+      <location filename="../../TaskPostBoxes.cpp" line="535"/>
       <source>Implicit function</source>
       <translation>Няяўная функцыя</translation>
     </message>
@@ -3535,7 +3535,7 @@ with harmonic/oscillating driving current</source>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="56"/>
-      <source>Drag the refinement, that should be altered, into the Manipulate object in the document tree</source>
+      <source>Drag the refinement that should be altered into the Manipulate object in the document tree</source>
       <translation>Перацягнуць удакладненне, якое павінна быць зменена, у аб'ект маніпулявання ў дрэве дакумента</translation>
     </message>
     <message>
@@ -3600,15 +3600,11 @@ with harmonic/oscillating driving current</source>
       <location filename="../ui/MeshAdvanced.ui" line="210"/>
       <location filename="../ui/MeshAdvanced.ui" line="399"/>
       <location filename="../ui/MeshDistance.ui" line="68"/>
-      <source>Mesh size when distance &lt; DistanceMinimum</source>
-      <translation>Памер паліганальнай сеткі пры адлегласці &lt; найменшай адлегласці (DistanceMinimum)</translation>
+      <source>Mesh size when distance = DistanceMaximum</source>
+      <translation>Памер паліганальнай сеткі пры адлегласці = найбольшай адлегласці (DistanceMaximum)</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="283"/>
-      <location filename="../ui/MeshManipulate.ui" line="527"/>
-      <location filename="../ui/MeshManipulate.ui" line="636"/>
-      <location filename="../ui/MeshManipulate.ui" line="708"/>
-      <location filename="../ui/MeshManipulate.ui" line="780"/>
       <location filename="../ui/MeshAdvanced.ui" line="179"/>
       <location filename="../ui/MeshDistance.ui" line="115"/>
       <source>Distance at which the mesh size will be SizeMaximum</source>
@@ -3621,13 +3617,11 @@ with harmonic/oscillating driving current</source>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="346"/>
-      <location filename="../ui/MeshTransfiniteCurve.ui" line="89"/>
-      <location filename="../ui/MeshTransfiniteCurve.ui" line="217"/>
       <location filename="../ui/MeshAdvanced.ui" line="337"/>
       <location filename="../ui/MeshAdvanced.ui" line="430"/>
       <location filename="../ui/MeshDistance.ui" line="178"/>
-      <source>Mesh size when distance = DistanceMaximum</source>
-      <translation>Памер паліганальнай сеткі пры адлегласці = найбольшай адлегласці (DistanceMaximum)</translation>
+      <source>Mesh size when distance &lt; DistanceMinimum</source>
+      <translation>Памер паліганальнай сеткі пры адлегласці &lt; найменшай адлегласці (DistanceMinimum)</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="365"/>
@@ -3685,6 +3679,14 @@ F = (G(x + delta, y, z) + G(x - delta, y, z) + G(x, y + delta, z) + G(x, y - del
       <location filename="../ui/MeshManipulate.ui" line="761"/>
       <source>Delta</source>
       <translation>Дэльта</translation>
+    </message>
+    <message>
+      <location filename="../ui/MeshManipulate.ui" line="527"/>
+      <location filename="../ui/MeshManipulate.ui" line="636"/>
+      <location filename="../ui/MeshManipulate.ui" line="708"/>
+      <location filename="../ui/MeshManipulate.ui" line="780"/>
+      <source>Delta in the aforementioned equation</source>
+      <translation>Дэльта ў вышэйзгаданым ураўненні</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="565"/>
@@ -3874,6 +3876,11 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
       <translation>Стварыць пэўную колькасць вузлоў паліганальнай сеткі на рэбрах з дапамогай структураванага алгарытму.</translation>
     </message>
     <message>
+      <location filename="../ui/MeshTransfiniteCurve.ui" line="89"/>
+      <source>Number of nodes on the edge</source>
+      <translation>Колькасць вузлоў на рэбры</translation>
+    </message>
+    <message>
       <location filename="../ui/MeshTransfiniteCurve.ui" line="111"/>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="260"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="283"/>
@@ -3897,7 +3904,7 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
       <location filename="../ui/MeshTransfiniteVolume.ui" line="250"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="273"/>
       <source>Bump</source>
-      <translation>Рэльеф</translation>
+      <translation>Двухбаковае ўшчыльненне</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteCurve.ui" line="163"/>
@@ -3910,6 +3917,11 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
       <location filename="../ui/MeshTransfiniteCurve.ui" line="195"/>
       <source>Coefficient</source>
       <translation>Каэфіцыэнт</translation>
+    </message>
+    <message>
+      <location filename="../ui/MeshTransfiniteCurve.ui" line="217"/>
+      <source>Coefficient for bump/progression growth rate</source>
+      <translation>Каэфіцыент для вызначэння хуткасці росту двухбаковага ўшчыльнення/прагрэсіі</translation>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="34"/>
@@ -4074,8 +4086,8 @@ Example: "F2 + Sin(z)"</source>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="952"/>
-      <source>Uses a datafield from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</source>
-      <translation>У якасці памеру паліганальнай сетки щжываецца поле дадзеных з канвеера пасляапрацоўкі МКЭ.
+      <source>Uses a data field from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</source>
+      <translation>У якасці памеру паліганальнай сеткі ўжываецца поле дадзеных з канвеера пасляапрацоўкі МКЭ.
 Дазваляе адаптаваць паліганальную сетку ў адпаведнасці з фізічнымі паводзінамі выніку.</translation>
     </message>
     <message>
@@ -4085,8 +4097,8 @@ Example: "F2 + Sin(z)"</source>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="116"/>
-      <source>Select any number of 5 or 6 sided volumes</source>
-      <translation>Абраць любую колькасць 5 ці 6 іншых аб'ёмаў</translation>
+      <source>Select any number of 5- or 6-sided volumes</source>
+      <translation>Абраць любую колькасць 5- ці 6-баковых аб'ёмаў</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="163"/>
@@ -4101,7 +4113,7 @@ Example: "F2 + Sin(z)"</source>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="205"/>
-      <source>If activated, all edges and surface belonging to the selected volumes that do not have a transfinite definitions already become transfinite automatically.
+      <source>If activated, all edges and surfaces belonging to the selected volumes that do not have a transfinite definition already become transfinite automatically.
 Use strategically placed transfinite curve and surface definitions to guide the automatic algorithm.
 
 Notes:
@@ -4129,7 +4141,7 @@ Notes:
       <location filename="../ui/MeshTransfiniteVolume.ui" line="255"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="278"/>
       <source>Bump Inverted</source>
-      <translation>Выпукласць перавернутая</translation>
+      <translation>Перавернутае двухбаковае ўшчыльненне</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="265"/>
@@ -4198,7 +4210,7 @@ Notes:
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="41"/>
-      <source>Define mesh element size based on distance to chosen reference geometries.</source>
+      <source>Define mesh element size based on the distance to the chosen reference geometries.</source>
       <translation>Вызначыць памер элемента паліганальнай сеткі на аснове адлегласці да абранай апорнай геаметрыі.</translation>
     </message>
     <message>
@@ -4218,7 +4230,7 @@ Notes:
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="304"/>
-      <source>Number of sampling points used to discretize curves and surfaces. For surface it is the sampling size per direction.</source>
+      <source>Number of sampling points used to discretize curves and surfaces. For surfaces, it is the sampling size per direction.</source>
       <translation>Колькасць кропак выбаркі, якія ўжываюцца для дыскрэтызацыі крывых і паверхняў.
 Для паверхні гэта памер выбаркі для кожнага напрамку.</translation>
     </message>
@@ -4261,9 +4273,9 @@ Notes:
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="184"/>
-      <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinements mesh size output: It shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh, therefore details smaller then the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+      <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinement mesh size output - it shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh; thus, details smaller than the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
       <translation>Візуалізуе вывад памеру паліганальнай сеткі ўдакладненняў: адлюстроўвае памеры паліганальнай сеткі, зададзеныя пры ўдакладненні, у выглядзе колераў на папярэднім праглядзе паліганальнай сеткі.
-Звярніце ўвагу, што пры папярэднім праглядзе ўдакладненне выконваецца на грубай паліганальнай сетцы, таму дэталі, памеры якіх менш памеру паліганальнай сеткі, могуць быць нябачныя.</translation>
+Звярніце ўвагу, што пры папярэднім праглядзе ўдакладненне выконваецца на грубай паліганальнай сетцы, такім чынам дэталі, памеры якіх менш памеру паліганальнай сеткі, могуць быць нябачныя.</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="187"/>
@@ -4277,7 +4289,7 @@ Notes:
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="95"/>
-      <source>Select multiple faces with 3 or 4 edges, optional with corner vertices of 3-sided faces.</source>
+      <source>Select multiple faces with 3 or 4 edges, optionally with corner vertices of 3-sided faces.</source>
       <translation>Абраць некалькі граняў з 3 ці 4 рэбрамі, неабавязкова з вуглавымі вяршынямі трохбаковых граняў.</translation>
     </message>
     <message>
@@ -4464,7 +4476,7 @@ Notes:
       <location filename="../../ViewProviderFemPostObject.cpp" line="900"/>
       <location filename="../../ViewProviderFemPostFunction.cpp" line="156"/>
       <source>Do you want to close this dialog?</source>
-      <translation>Ці жадаеце вы зачыніць дыялогавае акно?</translation>
+      <translation>Ці зачыніць дыялогавае акно?</translation>
     </message>
     <message>
       <location filename="../../ViewProviderFemMeshShapeNetgen.cpp" line="54"/>
@@ -4479,7 +4491,7 @@ Notes:
       <location filename="../../AppFemGui.cpp" line="199"/>
       <location filename="../../AppFemGui.cpp" line="200"/>
       <source>FEM</source>
-      <translation>МКЭ (Метад канчатковых элементаў)</translation>
+      <translation>МКЭ</translation>
     </message>
     <message>
       <location filename="../../AppFemGui.cpp" line="203"/>
@@ -4525,7 +4537,7 @@ Notes:
     <message>
       <location filename="../../ViewProviderAnalysis.cpp" line="320"/>
       <source>Are you sure you want to continue?</source>
-      <translation>Ці ўпэўненыя вы, што жадаеце працягнуць?</translation>
+      <translation>Ці сапраўды працягнуць?</translation>
     </message>
     <message>
       <location filename="../../ViewProviderFemConstraint.cpp" line="157"/>
@@ -6017,7 +6029,7 @@ normal vector of the face is used as direction</source>
     <message>
       <location filename="../../Workbench.cpp" line="39"/>
       <source>FEM</source>
-      <translation>МКЭ (Метад канчатковых элементаў)</translation>
+      <translation>МКЭ</translation>
     </message>
     <message>
       <location filename="../../Workbench.cpp" line="40"/>
@@ -8222,7 +8234,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostFrames</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="554"/>
+      <location filename="../../TaskPostBoxes.cpp" line="563"/>
       <source>Result Frames</source>
       <translation>Выніковыя кадры</translation>
     </message>
@@ -8230,7 +8242,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostCalculator</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="2248"/>
+      <location filename="../../TaskPostBoxes.cpp" line="2257"/>
       <source>Calculator options</source>
       <translation>Налады вылічэння</translation>
     </message>
@@ -8695,7 +8707,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostDisplay</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="453"/>
+      <location filename="../../TaskPostBoxes.cpp" line="462"/>
       <source>Result Display Options</source>
       <translation>Налады адлюстравання вынікаў</translation>
     </message>
@@ -8703,7 +8715,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostBranch</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="623"/>
+      <location filename="../../TaskPostBoxes.cpp" line="632"/>
       <source>Branch Behaviour</source>
       <translation>Паводзіны галіны</translation>
     </message>
@@ -8711,7 +8723,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostClip</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1495"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1504"/>
       <source>Clip Region, Choose Implicit Function</source>
       <translation>Абрэзаць вобласць, абраць няяўную функцыю</translation>
     </message>
@@ -8719,7 +8731,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostContours</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1646"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1655"/>
       <source>Contours Filter Options</source>
       <translation>Налады фільтра контураў</translation>
     </message>
@@ -8727,7 +8739,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostCut</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1810"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1819"/>
       <source>Function Cut, Choose Implicit Function</source>
       <translation>Функцыя выразання, абраць няяўную функцыю</translation>
     </message>
@@ -8735,7 +8747,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostScalarClip</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="1943"/>
+      <location filename="../../TaskPostBoxes.cpp" line="1952"/>
       <source>Scalar Clip Options</source>
       <translation>Налады скалярнага зрэзу</translation>
     </message>
@@ -8743,7 +8755,7 @@ Leave blank to use default Python executable</source>
   <context>
     <name>FemGui::TaskPostWarpVector</name>
     <message>
-      <location filename="../../TaskPostBoxes.cpp" line="2067"/>
+      <location filename="../../TaskPostBoxes.cpp" line="2076"/>
       <source>Warp Options</source>
       <translation>Налады дэфармацыі</translation>
     </message>
@@ -8853,7 +8865,7 @@ Leave blank to use default Python executable</source>
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="705"/>
-      <source>Adds a structured layer of mesh elmenets on 2D model boundaries</source>
+      <source>Adds a structured layer of mesh elements on 2D model boundaries</source>
       <translation>Дадае структураваны пласт элементаў паліганальнай сеткі на мяжы дзвюхмернай мадэлі</translation>
     </message>
   </context>
@@ -8934,8 +8946,8 @@ Leave blank to use default Python executable</source>
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="967"/>
-      <source>Creates a fixed amount of nodes on an endge with a structured algorithm</source>
-      <translation>Стварае фіксаваную колькасць вузлоў у канцавой кропцы з дапамогай структураванага алгарытму</translation>
+      <source>Creates a fixed number of nodes on an edge with a structured algorithm</source>
+      <translation>Стварае фіксаваную колькасць вузлоў на рэбры з дапамогай структураванага алгарытму</translation>
     </message>
   </context>
   <context>
@@ -8960,8 +8972,8 @@ Leave blank to use default Python executable</source>
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="998"/>
-      <source>Creates a structured mesh in a 4 or 5 sided volume bounded by transfinite surfaces</source>
-      <translation>Стварае структураваную паліганальную сетку ў 4 ці 5 баковым аб'ёме, абмежаваныя трансфінітнымі паверхнямі</translation>
+      <source>Creates a structured mesh in a 4- or 5-sided volume bounded by transfinite surfaces</source>
+      <translation>Стварае структураваную паліганальную сетку ў 4- ці 5-баковым аб'ёме, абмежаваныя трансфінітнымі паверхнямі</translation>
     </message>
   </context>
   <context>

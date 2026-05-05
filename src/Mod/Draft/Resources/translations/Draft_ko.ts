@@ -2087,42 +2087,56 @@ a raw wire from the original shape is added</source>
 최적값은 가져오기 대상의 절대 크기에 따라 달라집니다. 일반적인 값은 1에서 5 사이입니다.</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="205"/>
+      <location filename="../ui/preferences-svg.ui" line="190"/>
+      <source>Maximum deviation for approximation of complex curves</source>
+      <translation type="unfinished">Maximum deviation for approximation of complex curves</translation>
+    </message>
+    <message>
+      <location filename="../ui/preferences-svg.ui" line="210"/>
+      <source>Maximum deviation for the approximation of ellipses, hyperbolas, parabolas, and
+Bézier and B-spline curves to arcs and lines. Can be useful for the CAM Workbench.
+Set to zero to disable approximation.</source>
+      <translation type="unfinished">Maximum deviation for the approximation of ellipses, hyperbolas, parabolas, and
+Bézier and B-spline curves to arcs and lines. Can be useful for the CAM Workbench.
+Set to zero to disable approximation.</translation>
+    </message>
+    <message>
+      <location filename="../ui/preferences-svg.ui" line="256"/>
       <source>Export style</source>
       <translation>내보내기 스타일</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="212"/>
+      <location filename="../ui/preferences-svg.ui" line="263"/>
       <source>Style of SVG file to write when exporting a sketch</source>
       <translation>스케치를 내보낼 때 쓸 SVG 파일 스타일</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="225"/>
+      <location filename="../ui/preferences-svg.ui" line="276"/>
       <source>Translated (for print &amp; display)</source>
       <translation>번역됨(인쇄 및 디스플레이용)</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="230"/>
+      <location filename="../ui/preferences-svg.ui" line="281"/>
       <source>Raw (for CAM)</source>
       <translation>원본 (CAM)</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="242"/>
+      <location filename="../ui/preferences-svg.ui" line="293"/>
       <source>All white lines will appear in black in the SVG for better readability against white backgrounds</source>
       <translation>흰색 배경에 대한 가독성을 높이기 위해 SVG에서 모든 흰색 선이 검은색으로 표시됩니다.</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="245"/>
+      <location filename="../ui/preferences-svg.ui" line="296"/>
       <source>Convert white line color to black</source>
       <translation>흰색 선 색상을 검은색으로 변환</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="265"/>
+      <location filename="../ui/preferences-svg.ui" line="316"/>
       <source>Maximum segment length for discretized arcs</source>
       <translation>이산화된 호의 최대 세그먼트 길이</translation>
     </message>
     <message>
-      <location filename="../ui/preferences-svg.ui" line="288"/>
+      <location filename="../ui/preferences-svg.ui" line="336"/>
       <source>Versions of OpenCASCADE older than version 6.8 don't support arc projection.
 In this case arcs will be discretized into small line segments.
 This value is the maximum segment length.</source>
@@ -2437,7 +2451,7 @@ instead of Draft or Part objects. This overrides the 'Import As' setting</source
     </message>
     <message>
       <location filename="../ui/preferences-dxf.ui" line="504"/>
-      <location filename="../ui/preferences-svg.ui" line="191"/>
+      <location filename="../ui/preferences-svg.ui" line="242"/>
       <source>Export Options</source>
       <translation>내보내기 옵션</translation>
     </message>
@@ -3181,7 +3195,7 @@ if they match the X, Y or Z axis of the global coordinate system</source>
     <message>
       <location filename="../../DraftGui.py" line="591"/>
       <source>Length</source>
-      <translation>길이:</translation>
+      <translation>길이</translation>
     </message>
     <message>
       <location filename="../../DraftGui.py" line="592"/>
@@ -3302,7 +3316,7 @@ Uncheck to use working plane coordinate system</source>
     <message>
       <location filename="../../DraftGui.py" line="666"/>
       <source>Undo</source>
-      <translation>실행취소</translation>
+      <translation>실행 취소</translation>
     </message>
     <message>
       <location filename="../../DraftGui.py" line="700"/>
@@ -4049,7 +4063,12 @@ DWG 파일을 공백과 비영문 문자가 없는 디렉터리 경로로 옮겨
       <translation>%1 세 번째 점 선택</translation>
     </message>
     <message>
-      <location filename="../../draftguitools/gui_subelements.py" line="118"/>
+      <location filename="../../draftguitools/gui_subelements.py" line="87"/>
+      <source>Only Draft lines, wires, and curves can be highlighted</source>
+      <translation type="unfinished">Only Draft lines, wires, and curves can be highlighted</translation>
+    </message>
+    <message>
+      <location filename="../../draftguitools/gui_subelements.py" line="119"/>
       <source>Select an object to edit</source>
       <translation>편집할 대상체를 선택하세요</translation>
     </message>
@@ -6221,12 +6240,12 @@ from menu Tools → Addon Manager</source>
   <context>
     <name>ImportSVG</name>
     <message>
-      <location filename="../../importSVG.py" line="1264"/>
+      <location filename="../../importSVG.py" line="1326"/>
       <source>Unknown SVG export style, switching to Translated</source>
       <translation>알 수 없는 SVG export 스타일, switching 까지 Translated</translation>
     </message>
     <message>
-      <location filename="../../importSVG.py" line="1305"/>
+      <location filename="../../importSVG.py" line="1367"/>
       <source>The export list contains no object with a valid bounding box</source>
       <translation>내보내기 목록에 유효한 경계 상자를 가진 객체가 없습니다</translation>
     </message>
@@ -6275,7 +6294,7 @@ from menu Tools → Addon Manager</source>
     <message>
       <location filename="../../draftguitools/gui_hatch.py" line="42"/>
       <source>Hatch</source>
-      <translation>선무늬</translation>
+      <translation>해칭</translation>
     </message>
     <message>
       <location filename="../../draftguitools/gui_hatch.py" line="46"/>
@@ -6543,7 +6562,7 @@ Objects added to this layer can share the same visual properties.</source>
     <message>
       <location filename="../../draftguitools/gui_rectangles.py" line="58"/>
       <source>Rectangle</source>
-      <translation>사각형</translation>
+      <translation>직사각형</translation>
     </message>
     <message>
       <location filename="../../draftguitools/gui_rectangles.py" line="59"/>
@@ -7716,7 +7735,7 @@ the 'First Angle' 및 'Last Angle' 속성.</translation>
     <message>
       <location filename="../../draftviewproviders/view_draft_annotation.py" line="179"/>
       <source>Line color</source>
-      <translation>선 색</translation>
+      <translation>선 색상</translation>
     </message>
     <message>
       <location filename="../../draftviewproviders/view_base.py" line="113"/>

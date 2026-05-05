@@ -1742,7 +1742,7 @@ alıyorsanız bunu artırmanız gerekebilir.</translation>
   <context>
     <name>FemGui::TaskDlgFemConstraintForce</name>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="476"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="469"/>
       <source>Input error</source>
       <translation>Girdi hatası</translation>
     </message>
@@ -2248,55 +2248,55 @@ alıyorsanız bunu artırmanız gerekebilir.</translation>
   <context>
     <name>FemGui::TaskFemConstraintForce</name>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="92"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="93"/>
       <source>Select geometry of type: </source>
       <translation>Şu türde geometri seçin: </translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="92"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="93"/>
       <source>Vertex, Edge, Face</source>
       <translation>Köşe, Kenar, Yüz</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="125"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="134"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="142"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="184"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="207"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="216"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="126"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="135"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="143"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="185"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="208"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="217"/>
       <source>Selection error</source>
       <translation>Seçim hatası</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="125"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="207"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="126"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="208"/>
       <source>Nothing selected!</source>
       <translation>Seçim yok!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="134"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="216"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="135"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="217"/>
       <source>Selected object is not a part!</source>
       <translation>Temel nesne bir parçası olmadığını!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="143"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="144"/>
       <source>External object selection is not supported</source>
       <translation>Harici nesne seçimi desteklenmiyor</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="180"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="181"/>
       <source>Only one type of selection (vertex, face or edge) per analysis feature allowed!</source>
       <translation>Her analiz özelliği için yalnızca tek bir seçim türüne (köşe noktası, yüz veya kenar) izin verilir!</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="324"/>
-      <location filename="../../TaskFemConstraintForce.cpp" line="339"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="317"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="332"/>
       <source>Wrong selection</source>
       <translation>Yanlış seçim</translation>
     </message>
     <message>
-      <location filename="../../TaskFemConstraintForce.cpp" line="324"/>
+      <location filename="../../TaskFemConstraintForce.cpp" line="317"/>
       <source>Select an edge or a face.</source>
       <translation>Bir kenar veya bir yüz seçin.</translation>
     </message>
@@ -3513,7 +3513,7 @@ with harmonic/oscillating driving current</source>
     <message>
       <location filename="../ui/ElectricChargeDensity.ui" line="173"/>
       <source>Concentrated</source>
-      <translation type="unfinished">Concentrated</translation>
+      <translation>Konsantre</translation>
     </message>
     <message>
       <location filename="../ui/CurrentDensity.ui" line="23"/>
@@ -3533,34 +3533,34 @@ with harmonic/oscillating driving current</source>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="56"/>
-      <source>Drag the refinement, that should be altered, into the Manipulate object in the document tree</source>
-      <translation type="unfinished">Drag the refinement, that should be altered, into the Manipulate object in the document tree</translation>
+      <source>Drag the refinement that should be altered into the Manipulate object in the document tree</source>
+      <translation type="unfinished">Drag the refinement that should be altered into the Manipulate object in the document tree</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="70"/>
       <source>Type:</source>
-      <translation type="unfinished">Type:</translation>
+      <translation>Tür:</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="84"/>
       <source>Restrict</source>
-      <translation type="unfinished">Restrict</translation>
+      <translation>Kısıtla</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="89"/>
       <source>Threshold</source>
-      <translation type="unfinished">Threshold</translation>
+      <translation>Eşik</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="94"/>
       <location filename="../ui/MeshManipulate.ui" line="609"/>
       <source>Mean</source>
-      <translation type="unfinished">Mean</translation>
+      <translation>Ortalama</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="99"/>
       <source>Gradient</source>
-      <translation type="unfinished">Gradient</translation>
+      <translation>Gradyan</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="104"/>
@@ -3570,7 +3570,7 @@ with harmonic/oscillating driving current</source>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="109"/>
       <source>Laplacian</source>
-      <translation type="unfinished">Laplacian</translation>
+      <translation>Laplasyen</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="138"/>
@@ -3586,7 +3586,7 @@ with harmonic/oscillating driving current</source>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="163"/>
       <source>Include boundary</source>
-      <translation type="unfinished">Include boundary</translation>
+      <translation>Sınırları dahil edin</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="209"/>
@@ -3598,15 +3598,11 @@ with harmonic/oscillating driving current</source>
       <location filename="../ui/MeshAdvanced.ui" line="210"/>
       <location filename="../ui/MeshAdvanced.ui" line="399"/>
       <location filename="../ui/MeshDistance.ui" line="68"/>
-      <source>Mesh size when distance &lt; DistanceMinimum</source>
-      <translation type="unfinished">Mesh size when distance &lt; DistanceMinimum</translation>
+      <source>Mesh size when distance = DistanceMaximum</source>
+      <translation type="unfinished">Mesh size when distance = DistanceMaximum</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="283"/>
-      <location filename="../ui/MeshManipulate.ui" line="527"/>
-      <location filename="../ui/MeshManipulate.ui" line="636"/>
-      <location filename="../ui/MeshManipulate.ui" line="708"/>
-      <location filename="../ui/MeshManipulate.ui" line="780"/>
       <location filename="../ui/MeshAdvanced.ui" line="179"/>
       <location filename="../ui/MeshDistance.ui" line="115"/>
       <source>Distance at which the mesh size will be SizeMaximum</source>
@@ -3615,22 +3611,20 @@ with harmonic/oscillating driving current</source>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="308"/>
       <source>Output size</source>
-      <translation type="unfinished">Output size</translation>
+      <translation>Çıktı boyutu</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="346"/>
-      <location filename="../ui/MeshTransfiniteCurve.ui" line="89"/>
-      <location filename="../ui/MeshTransfiniteCurve.ui" line="217"/>
       <location filename="../ui/MeshAdvanced.ui" line="337"/>
       <location filename="../ui/MeshAdvanced.ui" line="430"/>
       <location filename="../ui/MeshDistance.ui" line="178"/>
-      <source>Mesh size when distance = DistanceMaximum</source>
-      <translation type="unfinished">Mesh size when distance = DistanceMaximum</translation>
+      <source>Mesh size when distance &lt; DistanceMinimum</source>
+      <translation type="unfinished">Mesh size when distance &lt; DistanceMinimum</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="365"/>
       <source>Input value</source>
-      <translation type="unfinished">Input value</translation>
+      <translation>Giriş değeri</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="387"/>
@@ -3647,12 +3641,12 @@ with harmonic/oscillating driving current</source>
       <location filename="../ui/MeshDistance.ui" line="266"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="59"/>
       <source>Diagram</source>
-      <translation type="unfinished">Diagram</translation>
+      <translation>Diyagram</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="452"/>
       <source>Linear interpolation</source>
-      <translation type="unfinished">Linear interpolation</translation>
+      <translation>Doğrusal ilişkilendirme</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="462"/>
@@ -3663,7 +3657,7 @@ with harmonic/oscillating driving current</source>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="472"/>
       <source>Stop at max input</source>
-      <translation type="unfinished">Stop at max input</translation>
+      <translation>Maksimum girişte dur</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="493"/>
@@ -3682,7 +3676,15 @@ F = (G(x + delta, y, z) + G(x - delta, y, z) + G(x, y + delta, z) + G(x, y - del
       <location filename="../ui/MeshManipulate.ui" line="689"/>
       <location filename="../ui/MeshManipulate.ui" line="761"/>
       <source>Delta</source>
-      <translation type="unfinished">Delta</translation>
+      <translation>Delta</translation>
+    </message>
+    <message>
+      <location filename="../ui/MeshManipulate.ui" line="527"/>
+      <location filename="../ui/MeshManipulate.ui" line="636"/>
+      <location filename="../ui/MeshManipulate.ui" line="708"/>
+      <location filename="../ui/MeshManipulate.ui" line="780"/>
+      <source>Delta in the aforementioned equation</source>
+      <translation type="unfinished">Delta in the aforementioned equation</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="565"/>
@@ -3698,7 +3700,7 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
     <message>
       <location filename="../ui/MeshManipulate.ui" line="580"/>
       <source>Kind</source>
-      <translation type="unfinished">Kind</translation>
+      <translation>Tür</translation>
     </message>
     <message>
       <location filename="../ui/MeshManipulate.ui" line="594"/>
@@ -3853,7 +3855,7 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
     <message>
       <location filename="../ui/MeshPreviewSettings.ui" line="54"/>
       <source>Auto enable on open</source>
-      <translation type="unfinished">Auto enable on open</translation>
+      <translation>Açıkken otomatik etkinleştir</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreviewSettings.ui" line="80"/>
@@ -3871,11 +3873,16 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
       <translation type="unfinished">Create a defined number of mesh nodes on edges with a structured algorithm.</translation>
     </message>
     <message>
+      <location filename="../ui/MeshTransfiniteCurve.ui" line="89"/>
+      <source>Number of nodes on the edge</source>
+      <translation type="unfinished">Number of nodes on the edge</translation>
+    </message>
+    <message>
       <location filename="../ui/MeshTransfiniteCurve.ui" line="111"/>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="260"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="283"/>
       <source>Progression</source>
-      <translation type="unfinished">Progression</translation>
+      <translation>İlerleme</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteCurve.ui" line="124"/>
@@ -3907,6 +3914,11 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
       <location filename="../ui/MeshTransfiniteCurve.ui" line="195"/>
       <source>Coefficient</source>
       <translation>Katsayı</translation>
+    </message>
+    <message>
+      <location filename="../ui/MeshTransfiniteCurve.ui" line="217"/>
+      <source>Coefficient for bump/progression growth rate</source>
+      <translation type="unfinished">Coefficient for bump/progression growth rate</translation>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="34"/>
@@ -3955,12 +3967,12 @@ F = (G(Kind + Delta/2) - G(Kind - Delta/2)) / Delta
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="315"/>
       <source>Size Tangent</source>
-      <translation type="unfinished">Size Tangent</translation>
+      <translation>Boyut Tanjantı</translation>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="449"/>
       <source>Size Normal</source>
-      <translation type="unfinished">Size Normal</translation>
+      <translation>Normal Boyut</translation>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="460"/>
@@ -4069,8 +4081,8 @@ Example: "F2 + Sin(z)"</translation>
     </message>
     <message>
       <location filename="../ui/MeshAdvanced.ui" line="952"/>
-      <source>Uses a datafield from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</source>
-      <translation type="unfinished">Uses a datafield from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</translation>
+      <source>Uses a data field from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</source>
+      <translation type="unfinished">Uses a data field from a FEM postprocessing pipeline as mesh size. This allows you to adapt the mesh according to the physical behaviour of the result.</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="38"/>
@@ -4079,8 +4091,8 @@ Example: "F2 + Sin(z)"</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="116"/>
-      <source>Select any number of 5 or 6 sided volumes</source>
-      <translation type="unfinished">Select any number of 5 or 6 sided volumes</translation>
+      <source>Select any number of 5- or 6-sided volumes</source>
+      <translation type="unfinished">Select any number of 5- or 6-sided volumes</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="163"/>
@@ -4094,13 +4106,13 @@ Example: "F2 + Sin(z)"</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="205"/>
-      <source>If activated, all edges and surface belonging to the selected volumes that do not have a transfinite definitions already become transfinite automatically.
+      <source>If activated, all edges and surfaces belonging to the selected volumes that do not have a transfinite definition already become transfinite automatically.
 Use strategically placed transfinite curve and surface definitions to guide the automatic algorithm.
 
 Notes:
 1. User-defined curves propagate to the opposite edges of faces, over all selected faces.
 2. Works with any number of volumes, either connected or unconnected </source>
-      <translation type="unfinished">If activated, all edges and surface belonging to the selected volumes that do not have a transfinite definitions already become transfinite automatically.
+      <translation type="unfinished">If activated, all edges and surfaces belonging to the selected volumes that do not have a transfinite definition already become transfinite automatically.
 Use strategically placed transfinite curve and surface definitions to guide the automatic algorithm.
 
 Notes:
@@ -4128,7 +4140,7 @@ Notes:
       <location filename="../ui/MeshTransfiniteVolume.ui" line="265"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="288"/>
       <source>Progression Inverted</source>
-      <translation type="unfinished">Progression Inverted</translation>
+      <translation>İlerleme Tersine Çevrildi</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteVolume.ui" line="304"/>
@@ -4139,7 +4151,7 @@ Notes:
       <location filename="../ui/MeshTransfiniteVolume.ui" line="323"/>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="181"/>
       <source>Recombine</source>
-      <translation type="unfinished">Recombine</translation>
+      <translation>Yeniden Birleştir</translation>
     </message>
     <message>
       <location filename="../ui/MeshShape.ui" line="38"/>
@@ -4155,7 +4167,7 @@ Notes:
     <message>
       <location filename="../ui/MeshShape.ui" line="57"/>
       <source>Size inside</source>
-      <translation type="unfinished">Size inside</translation>
+      <translation>İç boyut</translation>
     </message>
     <message>
       <location filename="../ui/MeshShape.ui" line="80"/>
@@ -4166,7 +4178,7 @@ Notes:
     <message>
       <location filename="../ui/MeshShape.ui" line="83"/>
       <source>Size outside</source>
-      <translation type="unfinished">Size outside</translation>
+      <translation>Dış boyut</translation>
     </message>
     <message>
       <location filename="../ui/MeshShape.ui" line="106"/>
@@ -4191,8 +4203,8 @@ Notes:
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="41"/>
-      <source>Define mesh element size based on distance to chosen reference geometries.</source>
-      <translation type="unfinished">Define mesh element size based on distance to chosen reference geometries.</translation>
+      <source>Define mesh element size based on the distance to the chosen reference geometries.</source>
+      <translation type="unfinished">Define mesh element size based on the distance to the chosen reference geometries.</translation>
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="140"/>
@@ -4207,17 +4219,17 @@ Notes:
     <message>
       <location filename="../ui/MeshDistance.ui" line="291"/>
       <source>Sampling size</source>
-      <translation type="unfinished">Sampling size</translation>
+      <translation>Örnekleme boyutu</translation>
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="304"/>
-      <source>Number of sampling points used to discretize curves and surfaces. For surface it is the sampling size per direction.</source>
-      <translation type="unfinished">Number of sampling points used to discretize curves and surfaces. For surface it is the sampling size per direction.</translation>
+      <source>Number of sampling points used to discretize curves and surfaces. For surfaces, it is the sampling size per direction.</source>
+      <translation type="unfinished">Number of sampling points used to discretize curves and surfaces. For surfaces, it is the sampling size per direction.</translation>
     </message>
     <message>
       <location filename="../ui/MeshDistance.ui" line="329"/>
       <source>Linear</source>
-      <translation type="unfinished">Linear</translation>
+      <translation>Doğrusal</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="96"/>
@@ -4228,12 +4240,12 @@ Notes:
     <message>
       <location filename="../ui/MeshPreview.ui" line="99"/>
       <source>Min:</source>
-      <translation type="unfinished">Min:</translation>
+      <translation>Min:</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="112"/>
       <source>1.00e+02</source>
-      <translation type="unfinished">1.00e+02</translation>
+      <translation>1.00e+02</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="138"/>
@@ -4244,17 +4256,17 @@ Notes:
     <message>
       <location filename="../ui/MeshPreview.ui" line="141"/>
       <source>Max:</source>
-      <translation type="unfinished">Max:</translation>
+      <translation>Maks:</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="154"/>
       <source>1.00e+03</source>
-      <translation type="unfinished">1.00e+03</translation>
+      <translation>1.00e+03</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="184"/>
-      <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinements mesh size output: It shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh, therefore details smaller then the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-      <translation type="unfinished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinements mesh size output: It shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh, therefore details smaller then the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+      <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinement mesh size output - it shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh; thus, details smaller than the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+      <translation type="unfinished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Visualizes the refinement mesh size output - it shows the mesh sizes given by the refinement as colors on a preview mesh. Note that the preview evaluates the refinement on a coarse mesh; thus, details smaller than the mesh size may not be visible.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
       <location filename="../ui/MeshPreview.ui" line="187"/>
@@ -4264,12 +4276,12 @@ Notes:
     <message>
       <location filename="../ui/MeshPreview.ui" line="197"/>
       <source>...</source>
-      <translation type="unfinished">...</translation>
+      <translation>...</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="95"/>
-      <source>Select multiple faces with 3 or 4 edges, optional with corner vertices of 3-sided faces.</source>
-      <translation type="unfinished">Select multiple faces with 3 or 4 edges, optional with corner vertices of 3-sided faces.</translation>
+      <source>Select multiple faces with 3 or 4 edges, optionally with corner vertices of 3-sided faces.</source>
+      <translation type="unfinished">Select multiple faces with 3 or 4 edges, optionally with corner vertices of 3-sided faces.</translation>
     </message>
     <message>
       <location filename="../ui/MeshTransfiniteSurface.ui" line="108"/>
@@ -4597,7 +4609,7 @@ Notes:
     <message>
       <location filename="../ui/ResultShow.ui" line="63"/>
       <source>von Mises stress</source>
-      <translation type="unfinished">von Mises stress</translation>
+      <translation>von Mises gerilmesi</translation>
     </message>
     <message>
       <location filename="../ui/ResultShow.ui" line="83"/>
@@ -4667,12 +4679,12 @@ Notes:
     <message>
       <location filename="../ui/ResultShow.ui" line="512"/>
       <source> Full cycle</source>
-      <translation type="unfinished"> Full cycle</translation>
+      <translation> Tam döngü</translation>
     </message>
     <message>
       <location filename="../ui/ResultShow.ui" line="528"/>
       <source>Half cycle</source>
-      <translation type="unfinished">Half cycle</translation>
+      <translation>Yarım döngü</translation>
     </message>
     <message>
       <location filename="../ui/ResultShow.ui" line="542"/>
@@ -4938,7 +4950,7 @@ Kullanılabilecek değişkenler için aşağıdaki açıklama kutusuna bakın.</
     <message>
       <location filename="../../TaskCreateNodeSet.ui" line="70"/>
       <source>Box</source>
-      <translation type="unfinished">Box</translation>
+      <translation>Kutu</translation>
     </message>
     <message>
       <location filename="../../TaskCreateNodeSet.ui" line="80"/>
@@ -6565,7 +6577,7 @@ yön olarak kullanılır</translation>
     <message>
       <location filename="../../../femtaskpanels/task_result_mechanical.py" line="362"/>
       <source>von Mises stress</source>
-      <translation type="unfinished">von Mises stress</translation>
+      <translation>von Mises gerilmesi</translation>
     </message>
     <message>
       <location filename="../../../femtaskpanels/task_result_mechanical.py" line="374"/>
@@ -8837,8 +8849,8 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="705"/>
-      <source>Adds a structured layer of mesh elmenets on 2D model boundaries</source>
-      <translation type="unfinished">Adds a structured layer of mesh elmenets on 2D model boundaries</translation>
+      <source>Adds a structured layer of mesh elements on 2D model boundaries</source>
+      <translation type="unfinished">Adds a structured layer of mesh elements on 2D model boundaries</translation>
     </message>
   </context>
   <context>
@@ -8918,8 +8930,8 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="967"/>
-      <source>Creates a fixed amount of nodes on an endge with a structured algorithm</source>
-      <translation type="unfinished">Creates a fixed amount of nodes on an endge with a structured algorithm</translation>
+      <source>Creates a fixed number of nodes on an edge with a structured algorithm</source>
+      <translation type="unfinished">Creates a fixed number of nodes on an edge with a structured algorithm</translation>
     </message>
   </context>
   <context>
@@ -8944,8 +8956,8 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="998"/>
-      <source>Creates a structured mesh in a 4 or 5 sided volume bounded by transfinite surfaces</source>
-      <translation type="unfinished">Creates a structured mesh in a 4 or 5 sided volume bounded by transfinite surfaces</translation>
+      <source>Creates a structured mesh in a 4- or 5-sided volume bounded by transfinite surfaces</source>
+      <translation type="unfinished">Creates a structured mesh in a 4- or 5-sided volume bounded by transfinite surfaces</translation>
     </message>
   </context>
   <context>
@@ -8953,12 +8965,12 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     <message>
       <location filename="../../../femcommands/commands.py" line="1358"/>
       <source>Solvers</source>
-      <translation type="unfinished">Solvers</translation>
+      <translation>Çözücüler</translation>
     </message>
     <message>
       <location filename="../../../femcommands/commands.py" line="1359"/>
       <source>Creates a FEM solver</source>
-      <translation type="unfinished">Creates a FEM solver</translation>
+      <translation>Bir FEM çözücü oluşturur</translation>
     </message>
   </context>
   <context>
@@ -8966,7 +8978,7 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     <message>
       <location filename="../ui/SolverZ88.ui" line="14"/>
       <source>Solver Z88 Control</source>
-      <translation type="unfinished">Solver Z88 Control</translation>
+      <translation>Çözücü Z88 Kontrol</translation>
     </message>
     <message>
       <location filename="../ui/SolverZ88.ui" line="20"/>
@@ -8996,7 +9008,7 @@ Varsayılan Python yürütücüsünü kullanmak için boş bırakın</translatio
     <message>
       <location filename="../ui/SolverZ88.ui" line="82"/>
       <source>Solver type</source>
-      <translation type="unfinished">Solver type</translation>
+      <translation>Çözücü türü</translation>
     </message>
     <message>
       <location filename="../ui/SolverZ88.ui" line="122"/>
