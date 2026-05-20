@@ -10,7 +10,9 @@ UPSTREAM_REMOTE="upstream"
 UPSTREAM_URL="https://github.com/FreeCAD/FreeCAD.git"
 UPSTREAM_BRANCH="releases/FreeCAD-1-1"
 LOCAL_BRANCH="personal/1.1-patched"
-APP="$REPO/build/release/src/MacAppBundle/FreeCAD.app"
+APP="$REPO/dist/FreeCAD.app"
+BINARY="$REPO/build/release/bin/FreeCAD"
+ICON_SRC="$REPO/src/MacAppBundle/FreeCAD.app/Contents/Resources/freecad.icns"
 
 echo "==> Ensuring upstream remote"
 if ! git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
@@ -42,12 +44,50 @@ pixi run build-release
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 APPLICATIONS_APP="$HOME/Applications/FreeCAD.app"
 
-if [[ ! -d "$APP" ]]; then
-    echo "==> $APP not found after build; aborting bundle refresh" >&2
+if [[ ! -x "$BINARY" ]]; then
+    echo "==> $BINARY missing after build; aborting" >&2
     exit 1
 fi
 
-echo "==> Refreshing $APP"
+echo "==> Generating launcher bundle at $APP"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp "$ICON_SRC" "$APP/Contents/Resources/freecad.icns"
+cat > "$APP/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>FreeCAD</string>
+    <key>CFBundleIdentifier</key><string>org.freecad.FreeCAD.dev</string>
+    <key>CFBundleName</key><string>FreeCAD</string>
+    <key>CFBundleDisplayName</key><string>FreeCAD</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>1.1</string>
+    <key>CFBundleVersion</key><string>1.1</string>
+    <key>CFBundleIconFile</key><string>freecad.icns</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>LSMinimumSystemVersion</key><string>11.0</string>
+</dict>
+</plist>
+EOF
+# LaunchServices rejects shell-script main executables (error -10669),
+# so compile a tiny native launcher that execs the build binary.
+LAUNCHER_C="$(mktemp -t freecad-launcher).c"
+cat > "$LAUNCHER_C" <<EOF
+#include <unistd.h>
+#include <stdio.h>
+int main(int argc, char *argv[]) {
+    argv[0] = (char *)"$BINARY";
+    execv("$BINARY", argv);
+    perror("execv");
+    return 1;
+}
+EOF
+clang -arch arm64 -o "$APP/Contents/MacOS/FreeCAD" "$LAUNCHER_C"
+rm -f "$LAUNCHER_C"
+
+echo "==> Signing and registering $APP"
 codesign --force --sign - "$APP"
 touch "$APP"
 "$LSREGISTER" -f "$APP"
