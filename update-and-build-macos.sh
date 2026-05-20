@@ -1,6 +1,6 @@
 #!/bin/bash
-# Fetch upstream releases/FreeCAD-1-1, merge into personal/1.1-patched,
-# wipe CMake cache, build release, and refresh the local .app launcher.
+# macOS: fetch upstream releases/FreeCAD-1-1, merge into personal/1.1-patched,
+# do a clean release build, and refresh the local .app launcher.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
@@ -30,9 +30,8 @@ git checkout "$LOCAL_BRANCH"
 echo "==> Merging $UPSTREAM_REMOTE/$UPSTREAM_BRANCH"
 git merge --no-edit "$UPSTREAM_REMOTE/$UPSTREAM_BRANCH"
 
-echo "==> Removing CMake cache"
-rm -f build/release/CMakeCache.txt
-rm -rf build/release/CMakeFiles
+echo "==> Wiping build/release for a clean build"
+rm -rf build/release
 
 echo "==> Configuring release"
 pixi run configure-release
