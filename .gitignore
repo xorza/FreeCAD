@@ -70,3 +70,6 @@ files_to_translate.txt
 # pixi environments
 .pixi
 *.egg-info
+
+
+dist
