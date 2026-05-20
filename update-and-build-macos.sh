@@ -10,7 +10,7 @@ UPSTREAM_REMOTE="upstream"
 UPSTREAM_URL="https://github.com/FreeCAD/FreeCAD.git"
 UPSTREAM_BRANCH="releases/FreeCAD-1-1"
 LOCAL_BRANCH="personal/1.1-patched"
-APP="$REPO/dist/FreeCAD.app"
+APP="$REPO/build/release/src/MacAppBundle/FreeCAD.app"
 
 echo "==> Ensuring upstream remote"
 if ! git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
@@ -42,19 +42,20 @@ pixi run build-release
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 APPLICATIONS_APP="$HOME/Applications/FreeCAD.app"
 
-if [[ -d "$APP" ]]; then
-    echo "==> Refreshing $APP"
-    codesign --force --sign - "$APP"
-    touch "$APP"
-    "$LSREGISTER" -f "$APP"
-
-    echo "==> Copying to $APPLICATIONS_APP"
-    mkdir -p "$HOME/Applications"
-    rm -rf "$APPLICATIONS_APP"
-    cp -R "$APP" "$APPLICATIONS_APP"
-    "$LSREGISTER" -f "$APPLICATIONS_APP"
-else
-    echo "==> $APP not found, skipping bundle refresh"
+if [[ ! -d "$APP" ]]; then
+    echo "==> $APP not found after build; aborting bundle refresh" >&2
+    exit 1
 fi
+
+echo "==> Refreshing $APP"
+codesign --force --sign - "$APP"
+touch "$APP"
+"$LSREGISTER" -f "$APP"
+
+echo "==> Copying to $APPLICATIONS_APP"
+mkdir -p "$HOME/Applications"
+rm -rf "$APPLICATIONS_APP"
+cp -R "$APP" "$APPLICATIONS_APP"
+"$LSREGISTER" -f "$APPLICATIONS_APP"
 
 echo "==> Done. Launch via Spotlight or: open '$APPLICATIONS_APP'"
