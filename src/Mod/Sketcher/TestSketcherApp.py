@@ -27,6 +27,7 @@ from SketcherTests.TestSketchFillet import TestSketchFillet
 from SketcherTests.TestSketchExpression import TestSketchExpression
 from SketcherTests.TestSketchValidateCoincidents import TestSketchValidateCoincidents
 from SketcherTests.TestSketchInternalFaces import TestSketchInternalFaces
+from SketcherTests.TestSketchCarbonCopyReverseMapping import TestSketchCarbonCopyReverseMapping
 
 # GUI-dependent tests - only import if GUI is available
 try:
